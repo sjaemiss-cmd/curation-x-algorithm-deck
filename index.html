@@ -650,9 +650,15 @@ body.editing [contenteditable="true"]:focus { outline-style: solid; }
                 <span class="tile-d">후보 글을 모으고 · 점수를 매기고 · 걸러내고 · 섞어서 배치한다</span>
             </div>
         </div>
-        <p class="reply-text reveal d4" style="font-size: 34px; font-weight: 600; margin-top: auto;">하는 일은 같다. 바뀐 건 <span class="em">누가, 어떤 기준으로</span> 하느냐다.</p>
+        <div class="reveal d4" style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+            <span class="pill">게이트키핑 — 실을까 말까</span>
+            <span style="font: 700 30px/1 var(--font-body); color: var(--blue);">→</span>
+            <span class="pill blue">웨이파인딩 — 어떻게 찾아오게 할까</span>
+            <span class="src">수업 「알고리즘 큐레이션과 저널리즘」 3번 장</span>
+        </div>
+        <p class="reply-text reveal d5" style="font-size: 34px; font-weight: 600; margin-top: auto;">하는 일은 같다. 바뀐 건 <span class="em">누가, 어떤 기준으로</span> 하느냐다.</p>
     </div>
-    <aside class="notes">큐레이션을 ‘모으고, 고르고, 빼고, 배치하는 일’로 정의하고 시작합니다. 신문은 사람이 이 일을 하고, 추천 탭은 코드가 합니다. 오늘 질문은 그 코드 안에 사람의 판단이 얼마나 남아 있느냐입니다.</aside>
+    <aside class="notes">큐레이션을 ‘모으고, 고르고, 빼고, 배치하는 일’로 정의하고 시작합니다. 수업에서 배운 것처럼, 기사가 넘쳐나는 지금은 ‘실을까 말까’를 정하는 게이트키핑보다 ‘많은 사람이 어떻게 찾아오게 할까’를 정하는 웨이파인딩이 더 중요해졌습니다. 신문은 사람이 이 일을 하고, 추천 탭은 코드가 합니다. 오늘 질문은 그 코드 안에 사람의 판단이 얼마나 남아 있느냐입니다.</aside>
 </section>
 
 <!-- =========================================================
@@ -1110,6 +1116,54 @@ body.editing [contenteditable="true"]:focus { outline-style: solid; }
 </section>
 
 <!-- =========================================================
+     16-A. DWELL — Kakao DRI link
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="클릭보다 머문 시간">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2023 ↔ 2026</span><span>수업 연결 ① 카카오 열독률</span></div>
+        <div class="head reveal d2"><h2 class="title">클릭보다 ‘머문 시간’을 본다</h2></div>
+        <div class="split" style="grid-template-columns: 1.08fr 0.92fr;">
+            <div class="stack">
+                <div class="post era-tw reveal d3">
+                    <div class="post-head"><span class="av tw">tw</span><div class="who"><b>twitter/the-algorithm-ml</b><span>projects/home/recap/README.md · 21, 38</span></div><span class="when">2023.04.05</span></div>
+                    <div class="code sm">
+                        <div class="l hl"><i>21</i><span>good_click_v2: … click into the conversation … and <b>stay there for at least 2 minutes</b>.</span></div>
+                        <div class="l"><i>38</i><span>scored_tweets_model_weight_good_click_v2: <span class="n">10.0</span></span></div>
+                    </div>
+                </div>
+                <div class="post reveal d4">
+                    <div class="post-head"><span class="av x">X</span><div class="who"><b>home-mixer/params/param.rs</b><span>451 · 490–500 · 521–526</span></div><span class="when">2026.11.03</span></div>
+                    <div class="code sm">
+                        <div class="l"><i>451</i><span><span class="k">param!</span>(DwellWeight, f64, <span class="s">"…_dwell_weight"</span>, <span class="n">0.05</span>);</span></div>
+                        <div class="l"><i>493</i><span>    ContDwellTimeWeight … <span class="n">0.006</span></span></div>
+                        <div class="l"><i>499</i><span>    ContClickDwellTimeWeight … <span class="n">0.4</span></span></div>
+                        <div class="l del"><i>525</i><span>    NotDwelledWeight … <span class="m">-0.02</span></span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">수업</span>
+                    <div class="reply-body"><span class="reply-name">카카오 뉴스 큐레이션 <span>· 15–17번 장</span></span>
+                    <p class="reply-text">클릭률만 보면 낚시 기사가 뜬다. 그래서 카카오는 <b>열독률 지수(DRI)</b>를 넣었다. 예상보다 빨리 나가면 ‘제목 낚시’로 본다.</p></div>
+                </div>
+                <div class="reply reveal d5">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면</span>
+                    <p class="reply-text">트위터는 2023년에도 ‘2분 이상 머물 확률’을 쳐줬다. 2026년 X는 머문 시간을 세 갈래로 나눴고, <span class="red">머물지 않고 지나친 글은 감점</span>한다. 카카오와 같은 문제의식이다.</p></div>
+                </div>
+                <div class="reply warn reveal d5">
+                    <span class="av us">주의</span>
+                    <div class="reply-body"><span class="reply-name">숫자 크기는 비교 금지</span>
+                    <p class="reply-text">2026년 값 일부는 확률이 아니라 ‘예측 시간’에 곱한다(README 370). 10과 0.4를 바로 비교하면 안 된다.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">수업에서 본 카카오 사례와 연결됩니다. 카카오는 클릭률만 보면 낚시 기사가 뜬다는 문제 때문에 열독률 지수를 도입했습니다. 트위터도 2023년에 이미 ‘대화를 열고 2분 이상 머물 확률’에 가중치 10을 줬습니다. 2026년 X는 머문 시간을 세 가지로 나눠 예측하고, 머물지 않고 지나친 글에는 감점을 줍니다. 다만 2026년 값 일부는 확률이 아니라 예측 시간에 곱하는 값이라 숫자 크기를 그대로 비교하면 안 됩니다.</aside>
+</section>
+
+<!-- =========================================================
      17. WEIGHTS KEEP MOVING
      ========================================================= -->
 <section class="slide era-x" data-era="x" aria-label="가중치는 지금도 바뀐다">
@@ -1239,6 +1293,54 @@ body.editing [contenteditable="true"]:focus { outline-style: solid; }
         </div>
     </div>
     <aside class="notes">X가 직접 공개한 문서입니다. 맞팔 상대의 글에 주는 가산점을 실험으로 5, 10, 15, 20 중에서 골랐고, 20으로 늘렸다가 월드컵 기간에 “경기 이야기가 잘 안 보인다”는 피드백을 듣고 15로 낮췄습니다. 숫자 하나에 사람의 판단이 들어가는 과정이 그대로 보입니다.</aside>
+</section>
+
+<!-- =========================================================
+     19-A. BANDIT — Kakao Rubics MAB link
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="새 작성자 슬롯머신">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2026 · X</span><span>수업 연결 ② 멀티암드밴딧</span></div>
+        <div class="head reveal d2"><h2 class="title">카카오의 슬롯머신이 X에 들어왔다</h2></div>
+        <div class="split" style="grid-template-columns: 1.08fr 0.92fr;">
+            <div class="stack">
+                <div class="post reveal d3">
+                    <div class="post-head"><span class="av x">X</span><div class="who"><b>home-mixer/scorers/author_cold_start.rs</b><span>243–255 · 타입 표기 일부 줄임</span></div><span class="when">2026.11.04</span></div>
+                    <div class="code sm">
+                        <div class="l"><i>243</i><span><span class="k">fn</span> sample_reward(candidate, alpha0, beta0, scale, rng) -&gt; f64 {</span></div>
+                        <div class="l hl"><i>250</i><span>    <span class="k">let</span> n = scale * candidate.view_count_on_home;  <span class="c">// 노출 수</span></span></div>
+                        <div class="l hl"><i>251</i><span>    <span class="k">let</span> x = candidate.fav_count.min(n);            <span class="c">// 좋아요 수</span></span></div>
+                        <div class="l"><i>252</i><span>    <span class="k">let</span> alpha = alpha0 + x;</span></div>
+                        <div class="l"><i>253</i><span>    <span class="k">let</span> beta = beta0 + (n - x);</span></div>
+                        <div class="l hl"><i>254</i><span>    Beta::new(alpha, beta).sample(rng)  <span class="c">// 매번 새로 추첨</span></span></div>
+                    </div>
+                </div>
+                <div class="tiles reveal d4" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="tile"><span class="tile-k">누구 글</span><span class="tile-t" style="font-size: 28px;">팔로워 5만 이하</span><span class="tile-d">param.rs 623</span></div>
+                    <div class="tile"><span class="tile-k">어떤 글</span><span class="tile-t" style="font-size: 28px;">노출 200 미만<br>올린 지 2시간 안</span><span class="tile-d">param.rs 605 · 629</span></div>
+                    <div class="tile" style="border-color: var(--blue);"><span class="tile-k" style="color: var(--blue);">결과</span><span class="tile-t" style="font-size: 28px;">1개를<br>16번째 자리로</span><span class="tile-d">param.rs 611 · 617</span></div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">수업</span>
+                    <div class="reply-body"><span class="reply-name">카카오 뉴스 큐레이션 <span>· 3–5번 장</span></span>
+                    <p class="reply-text">루빅스는 <b>멀티암드밴딧</b>이었다. 당첨 확률을 모르는 슬롯머신 여러 대를 돌려 보며 잘 터지는 기계를 찾는다. 기계는 기사, 당첨은 클릭이다.</p></div>
+                </div>
+                <div class="reply reveal d5">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면 <span>· param.rs 646–661</span></span>
+                    <p class="reply-text">X는 아직 덜 알려진 작성자의 새 글을 슬롯머신처럼 다룬다. 노출과 좋아요로 ‘터질 확률’을 추첨하고(Thompson Sampling, 기본 기대치 <span class="em">좋아요 1.5%</span>), 뽑힌 글 하나를 위로 올려 기회를 준다.</p></div>
+                </div>
+                <div class="reply warn reveal d5">
+                    <span class="av us">주의</span>
+                    <div class="reply-body"><span class="reply-name">2023 공개본에는 없음</span>
+                    <p class="reply-text">2023년 첫 공개 코드(ef4c5eb) 전체에 thompson·bandit이라는 말이 없다. 운영에서 쓰지 않았다는 증거는 아니다.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">수업에서 카카오 루빅스가 멀티암드밴딧 방식이라고 배웠습니다. 당첨 확률을 모르는 슬롯머신 여러 대 중 잘 터지는 기계를 찾아가는 방법입니다. 2026년 X 코드에도 같은 계열의 Thompson Sampling이 있습니다. 팔로워 5만 이하 작성자가 2시간 안에 올린, 아직 노출 200회가 안 된 글들을 놓고, 노출과 좋아요 수로 터질 확률을 매번 추첨합니다. 뽑힌 글 하나는 피드 16번째 자리까지 끌어올립니다. 2023년 공개 코드에는 이런 장치가 없었습니다. 다만 공개본 기준이라는 점은 분명히 해야 합니다.</aside>
 </section>
 
 <!-- =========================================================
@@ -1454,7 +1556,7 @@ body.editing [contenteditable="true"]:focus { outline-style: solid; }
     </div>
     <div class="half r era-x" style="background: transparent;">
         <div class="topbar reveal d1"><span class="era-tag">2026에도</span><span></span></div>
-        <h2 class="title reveal d2" style="font-size: 50px;">다섯 가지 기본 전제</h2>
+        <h2 class="title reveal d2" style="font-size: 50px;">여섯 가지 기본 전제</h2>
     </div>
     <div class="prem">
         <div class="prem-row reveal d2"><span class="claim">① 큐레이션 = 예측 × 가치 판단</span><span class="ev2 l">score = sum_i { (weight) * (probability) } · recap README 45</span><span class="ev2 r">Final Score = Σ (weight_i × P(action_i)) · README 365</span></div>
@@ -1462,8 +1564,9 @@ body.editing [contenteditable="true"]:focus { outline-style: solid; }
         <div class="prem-row reveal d3"><span class="claim">③ 다양성은 규칙으로 지킨다</span><span class="ev2 l">Decay = <b>0.5</b> · Floor = <b>0.25</b></span><span class="ev2 r">AuthorDiversityDecay <b>0.5</b> · Floor <b>0.25</b></span></div>
         <div class="prem-row reveal d4"><span class="claim">④ 순서와 노출 허용은 따로 정한다</span><span class="ev2 l">visibility-filters: hard-filtering, visible product treatments, downranking · README 48</span><span class="ev2 r">“Ranking and Visibility Are Separate” · README 492</span></div>
         <div class="prem-row reveal d5"><span class="claim">⑤ 숫자는 플랫폼 목표에 맞춰 계속 고친다</span><span class="ev2 l">“periodically adjusted the weights to optimize for platform metrics” · recap README 50</span><span class="ev2 r">가중치 변경 이력 · A/B 실험 · 20 → 15</span></div>
+        <div class="prem-row reveal d5"><span class="claim">⑥ 이미 본 글은 빼고, 새 글을 먼저</span><span class="ev2 l">PreviouslySeenTweetsFilter · PreviouslyServedTweetsFilter</span><span class="ev2 r">PreviouslySeen·Served 필터 3개 · 48시간 지나면 제외 · config.rs 39</span></div>
     </div>
-    <aside class="notes">다섯 가지입니다. 첫째, 큐레이션은 반응 예측에 회사의 가치 판단을 곱한 것입니다. 둘째, 관계가 신뢰를 정합니다. 모르는 사람 글은 똑같이 0.75배입니다. 셋째, 다양성은 AI가 아니라 규칙으로 지킵니다. 넷째, 순서를 정하는 일과 보여 줄지 정하는 일은 따로입니다. 다섯째, 이 숫자들은 플랫폼 목표에 맞춰 계속 조정됩니다. 2023년 설명서도 그렇게 인정했습니다.</aside>
+    <aside class="notes">여섯 가지입니다. 첫째, 큐레이션은 반응 예측에 회사의 가치 판단을 곱한 것입니다. 둘째, 관계가 신뢰를 정합니다. 모르는 사람 글은 똑같이 0.75배입니다. 셋째, 다양성은 AI가 아니라 규칙으로 지킵니다. 넷째, 순서를 정하는 일과 보여 줄지 정하는 일은 따로입니다. 다섯째, 이 숫자들은 플랫폼 목표에 맞춰 계속 조정됩니다. 2023년 설명서도 그렇게 인정했습니다. 여섯째, 이미 본 글은 다시 보여 주지 않고 새 글을 먼저 보여 줍니다. 수업에서 본 카카오 루빅스가 같은 기사를 반복 추천하면 감점하고 최신 데이터에 가중치를 더 준 것과 같은 전제입니다.</aside>
 </section>
 
 <!-- =========================================================
@@ -1535,18 +1638,40 @@ body.editing [contenteditable="true"]:focus { outline-style: solid; }
 </section>
 
 <!-- =========================================================
+     28-A. COURSE CONCEPTS — journalism lens
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="수업 개념으로 다시 읽기">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">수업 연결 ③</span><span>알고리즘 큐레이션과 저널리즘</span></div>
+        <div class="head reveal d2"><h2 class="title">수업 개념으로 다시 읽기</h2></div>
+        <table class="cmp reveal d3">
+            <thead><tr><th style="width: 21%;">수업 개념</th><th style="width: 22%;">2023 트위터</th><th style="width: 27%;">2026 X</th><th>우리 해석</th></tr></thead>
+            <tbody>
+                <tr><td><b>상업적 vs 공익적 가치</b><br><span class="src">12번 장</span></td><td>점수 = 반응 예측뿐</td><td>반응 예측뿐 + 법이 요구한 선거 필터</td><td>공익 가치는 점수가 아니라 <b>예외 규칙</b>으로만 들어간다</td></tr>
+                <tr><td><b>블랙박스</b><br><span class="src">15번 장</span></td><td>전용 신경망 · 설명 도구 없음</td><td>Grok 계열 모델 하나 · 내 라벨 확인 도구</td><td>순위 근거는 더 불투명해졌고, 노출 제한 이유만 조금 보인다</td></tr>
+                <tr><td><b>다양성의 조작적 정의</b><br><span class="src">19–21번 장</span></td><td>같은 작성자 0.5배 · 하한 0.25</td><td>똑같다</td><td>재는 건 <b>출처</b>의 다양성뿐. 수업의 인용·논조 같은 <span class="em">내용 다양성</span>은 없다</td></tr>
+                <tr><td><b>알고리즘을 예측하는 생산자</b><br><span class="src">4–7번 장</span></td><td>설명서만 공개</td><td>“가중치 흔한 오해” 반박을 문서에 직접 씀</td><td>플랫폼이 창작자에게 알고리즘 읽는 법을 가르치기 시작했다</td></tr>
+            </tbody>
+        </table>
+        <p class="src reveal d4">수업 자료: 「알고리즘 큐레이션과 저널리즘」(2026.11) · 근거: x-algorithm README 370, 374 · vm-ranker/params.rs 182–191</p>
+    </div>
+    <aside class="notes">수업에서 배운 저널리즘 개념으로 두 코드를 다시 읽으면 이렇습니다. 첫째, 두 시스템 모두 점수는 반응 예측뿐이고, 공익 가치는 브라질 선거 필터처럼 예외 규칙으로만 들어갑니다. 둘째, 블랙박스 문제는 AI 모델이 하나로 합쳐지면서 커졌지만, 노출 제한 이유를 보여 주는 도구가 생겼습니다. 셋째, X가 지키는 다양성은 같은 작성자 글을 줄이는 출처 다양성뿐입니다. 수업에서 본 인용 수나 논조의 균형 같은 내용 다양성은 코드에 없습니다. 넷째, 기자들이 포털 알고리즘을 추측하며 기사를 썼듯, 이제 플랫폼이 직접 알고리즘 읽는 법을 문서로 알려 줍니다.</aside>
+</section>
+
+<!-- =========================================================
      29. CONCLUSION + DISCUSSION
      ========================================================= -->
 <section class="slide era-x" data-era="x" aria-label="결론">
     <div class="pad" style="justify-content: center; gap: 56px;">
         <div class="kicker reveal d1">결론</div>
         <h2 class="reveal d2" style="font: 900 92px/1.15 var(--font-display); letter-spacing: -0.035em; color: var(--ink); text-wrap: balance; max-width: 1560px;">편집자는 사라지지 않았다.<br><span style="color: var(--blue);">숫자와 목록과 실험 속으로</span> 들어갔다.</h2>
-        <div class="tiles reveal d3" style="grid-template-columns: 1fr 1fr; max-width: 1600px;">
-            <div class="tile"><span class="tile-k">토론 질문 1</span><span class="tile-t">유료 인증 우대는 정말 사라졌을까, AI 모델 안으로 들어갔을까?</span></div>
-            <div class="tile"><span class="tile-k">토론 질문 2</span><span class="tile-t">학습 데이터 없이 코드만 공개하면, 큐레이션은 투명해진 걸까?</span></div>
+        <div class="tiles reveal d3" style="grid-template-columns: 1fr 1fr 1fr; max-width: 1680px;">
+            <div class="tile"><span class="tile-k">토론 질문 1</span><span class="tile-t" style="font-size: 30px;">유료 인증 우대는 정말 사라졌을까, AI 모델 안으로 들어갔을까?</span></div>
+            <div class="tile"><span class="tile-k">토론 질문 2</span><span class="tile-t" style="font-size: 30px;">학습 데이터 없이 코드만 공개하면, 큐레이션은 투명해진 걸까?</span></div>
+            <div class="tile"><span class="tile-k">토론 질문 3</span><span class="tile-t" style="font-size: 30px;">‘식견 있는 공중’을 위한 다양성이라면, 같은 작성자 줄이기 말고 무엇을 재야 할까?</span></div>
         </div>
     </div>
-    <aside class="notes">결론입니다. 추천 알고리즘 시대에도 편집자는 사라지지 않았습니다. 가중치라는 숫자, 계정 목록, 그리고 실험 속으로 들어갔습니다. 마지막으로 두 가지 질문을 던지며 마칩니다.</aside>
+    <aside class="notes">결론입니다. 추천 알고리즘 시대에도 편집자는 사라지지 않았습니다. 가중치라는 숫자, 계정 목록, 그리고 실험 속으로 들어갔습니다. 마지막으로 세 가지 질문을 던지며 마칩니다. 세 번째 질문은 수업에서 다룬 ‘식견 있는 공중’과 다양성의 조작적 정의에서 가져왔습니다.</aside>
 </section>
 
 <!-- =========================================================
@@ -1556,7 +1681,7 @@ body.editing [contenteditable="true"]:focus { outline-style: solid; }
     <div class="pad">
         <div class="topbar reveal d1"><span class="era-tag">출처</span><span>모든 인용은 아래 시점의 원본</span></div>
         <div class="head reveal d2"><h2 class="title">출처</h2></div>
-        <div class="tiles reveal d3" style="grid-template-columns: 1fr 1fr;">
+        <div class="tiles reveal d3" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="tile">
                 <span class="tile-k">2023 트위터</span>
                 <span class="src" style="font-size: 22px; color: var(--ink);">github.com/twitter/the-algorithm<br>ef4c5eb (2023-03-31 첫 공개)<br>ec83d01 (2023-03-31 측정 코드 삭제)<br>72eda9a (2023-07-13) · c54bec0 (2025-09-03)<br><br>github.com/twitter/the-algorithm-ml<br>b852108 (2023-04-05 가중치 설명)</span>
@@ -1564,6 +1689,10 @@ body.editing [contenteditable="true"]:focus { outline-style: solid; }
             <div class="tile">
                 <span class="tile-k">2026 X</span>
                 <span class="src" style="font-size: 22px; color: var(--ink);">github.com/xai-org/x-algorithm<br>aaa167b (2026-01-20 첫 공개)<br>47c1bcd (2026-08-13 대규모 공개)<br>c65aa17 · b412112 · 17c96bf · 5ed7963 (브라질 필터 이력)<br>b508926 (2026-11-04 분석 기준)<br>docs/BIDIRECTIONAL_BOOST_CHANGE.md</span>
+            </div>
+            <div class="tile">
+                <span class="tile-k">수업 자료</span>
+                <span class="src" style="font-size: 22px; color: var(--ink);">「카카오 뉴스 큐레이션」(2026.11)<br>「알고리즘 큐레이션과 저널리즘」(2026.11)<br><br>박승택 외(2017), 기계학습 기반의 뉴스 추천 서비스 구조와 그 효과에 대한 고찰: 카카오의 루빅스를 중심으로, 사이버커뮤니케이션학보 34(1)<br><br>Lee &amp; Kim(2019), Kakao Deep Reading Index, KSII TIIS 13(10)</span>
             </div>
         </div>
         <p class="src reveal d4">분석 노트: research/curation-x-algorithm/REPORT.md · 화살표 키로 넘기기, N 발표 메모, E 텍스트 수정, F 전체 화면</p>
@@ -1580,7 +1709,7 @@ body.editing [contenteditable="true"]:focus { outline-style: solid; }
 <div class="notes-panel" id="notesPanel" hidden><strong>발표 메모</strong><div id="notesText"></div></div>
 <nav class="chrome" aria-label="슬라이드 이동">
     <button type="button" id="prevBtn" aria-label="이전 슬라이드">‹</button>
-    <span id="counter">1 / 30</span>
+    <span id="counter">1 / 33</span>
     <button type="button" id="nextBtn" aria-label="다음 슬라이드">›</button>
     <span class="yr">2023</span><span class="prog" aria-hidden="true"><b id="progBar" style="width: 0%;"></b></span><span class="yr">2026</span>
     <button type="button" id="notesBtn" aria-pressed="false" title="발표 메모 (N)">메모</button>
