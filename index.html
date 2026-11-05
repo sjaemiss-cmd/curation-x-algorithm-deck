@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>타임라인의 편집자</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;700;800;900&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+/* ===========================================
+   DESIGN TOKENS
+   Layout: a 1920×1080 stage read like a timeline. Code excerpts are "posts",
+   plain-language explanations are "replies" threaded under them. The palette
+   moves from the 2023 Twitter light theme to the 2026 X black theme; the one
+   token both eras share, the blue, carries the "what never changed" thread.
+   =========================================== */
+:root {
+    /* 2023 Twitter era */
+    --tw-bg: #FFFFFF;
+    --tw-ink: #0F1419;
+    --tw-sub: #536471;
+    --tw-line: #E4EAED;
+    --tw-wash: #F7F9F9;
+    /* 2026 X era */
+    --x-bg: #000000;
+    --x-ink: #E7E9EA;
+    --x-sub: #8B9096;
+    --x-line: #2F3336;
+    --x-wash: #16181C;
+    /* shared action colors (the same in both products) */
+    --blue: #1D9BF0;
+    --like: #F91880;
+    --repost: #00BA7C;
+    --alert: #F4212E;
+
+    /* type */
+    --font-display: 'Gothic A1', 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    --font-body: 'IBM Plex Sans KR', 'Gothic A1', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    --font-mono: 'JetBrains Mono', 'IBM Plex Sans KR', ui-monospace, Consolas, monospace;
+
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* presentation chrome (outside the stage) */
+    --stage-bg: var(--tw-bg);
+    --chrome-bg: rgba(255, 255, 255, 0.86);
+    --chrome-ink: var(--tw-ink);
+    --chrome-sub: var(--tw-sub);
+    --chrome-line: var(--tw-line);
+    color-scheme: light;
+}
+
+body[data-era="x"] {
+    --stage-bg: var(--x-bg);
+    --chrome-bg: rgba(22, 24, 28, 0.86);
+    --chrome-ink: var(--x-ink);
+    --chrome-sub: var(--x-sub);
+    --chrome-line: var(--x-line);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ===========================================
+   FIXED 16:9 STAGE: MANDATORY BASE STYLES (frontend-slides viewport-base.css)
+   =========================================== */
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+.deck-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+.deck-stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    transform-origin: 0 0;
+    background: var(--slide-bg, #fff);
+}
+.slide {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    background: var(--slide-bg, #fff);
+}
+.slide.active,
+.slide.visible {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+img, video, canvas, svg { max-width: 100%; max-height: 100%; }
+.deck-controls {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    z-index: 1000;
+}
+@media print {
+    html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+    .deck-viewport { position: static; overflow: visible; background: #fff; }
+    .deck-stage { position: static; width: auto; height: auto; transform: none !important; background: none; }
+    .slide {
+        position: relative; display: block !important; visibility: visible !important;
+        opacity: 1 !important; pointer-events: auto !important;
+        width: 1920px; height: 1080px; break-after: page; page-break-after: always;
+    }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .deck-controls { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+    }
+}
+
+/* ===========================================
+   BODY + STAGE BACKGROUND
+   =========================================== */
+body {
+    font-family: var(--font-body);
+    color: var(--chrome-ink);
+    transition: background-color 0.8s ease;
+}
+.deck-viewport { transition: background-color 0.8s ease; }
+
+/* ===========================================
+   ERA SCOPES — every component reads these tokens
+   =========================================== */
+.era-tw {
+    --bg: var(--tw-bg); --ink: var(--tw-ink); --sub: var(--tw-sub);
+    --line: var(--tw-line); --wash: var(--tw-wash);
+    --code-bg: var(--tw-wash); --num: #1A8CD8; --str: #00875A;
+    --hl: rgba(29, 155, 240, 0.11); --del: rgba(244, 33, 46, 0.08);
+    --av-x-bg: var(--tw-ink); --av-x-ink: var(--tw-bg);
+    color: var(--ink);
+    background: var(--bg);
+}
+.era-x {
+    --bg: var(--x-bg); --ink: var(--x-ink); --sub: var(--x-sub);
+    --line: var(--x-line); --wash: var(--x-wash);
+    --code-bg: var(--x-wash); --num: #4CB3F5; --str: #2BD49A;
+    --hl: rgba(29, 155, 240, 0.18); --del: rgba(244, 33, 46, 0.16);
+    --av-x-bg: var(--x-ink); --av-x-ink: var(--x-bg);
+    color: var(--ink);
+    background: var(--bg);
+}
+
+/* Slide crossfade so white → black reads as one motion */
+.slide { transition: opacity 0.55s ease, visibility 0.55s ease; font-family: var(--font-body); }
+.slide .notes { display: none; }
+
+/* ===========================================
+   SLIDE LAYOUT PRIMITIVES
+   =========================================== */
+.pad {
+    position: absolute;
+    inset: 0;
+    padding: 76px 120px 124px;
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+}
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font: 500 21px/1 var(--font-mono);
+    color: var(--sub);
+    letter-spacing: 0.04em;
+}
+.era-tag { display: inline-flex; align-items: center; gap: 14px; }
+.era-tag::before {
+    content: "";
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--blue);
+}
+.kicker {
+    font: 500 22px/1.3 var(--font-mono);
+    color: var(--blue);
+    letter-spacing: 0.06em;
+}
+.title {
+    font: 800 60px/1.18 var(--font-display);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    color: var(--ink);
+}
+.era-x .title { letter-spacing: -0.035em; }
+.lead {
+    font: 400 30px/1.6 var(--font-body);
+    color: var(--sub);
+    max-width: 1240px;
+}
+.head { display: flex; flex-direction: column; gap: 14px; }
+.split {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 64px;
+    align-items: start;
+}
+.split > * { min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.em { color: var(--blue); font-weight: 700; }
+.red { color: var(--alert); font-weight: 700; }
+
+/* ===========================================
+   POST CARD (a source excerpt shown as a timeline post)
+   =========================================== */
+.post {
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    background: var(--bg);
+    overflow: hidden;
+    min-width: 0;
+}
+.era-x .post { border-radius: 16px; }
+.post-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 26px 14px;
+}
+.av {
+    width: 52px; height: 52px; flex: none;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font: 900 21px/1 var(--font-display);
+}
+.av.tw { background: var(--blue); color: #FFFFFF; }
+.av.x { background: var(--av-x-bg); color: var(--av-x-ink); border-radius: 12px; font-size: 26px; }
+.who { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.who b { font: 700 23px/1.2 var(--font-body); color: var(--ink); }
+.who span {
+    font: 400 19px/1.3 var(--font-mono); color: var(--sub);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.when { font: 400 19px/1 var(--font-mono); color: var(--sub); flex: none; }
+
+/* code body */
+.code {
+    margin: 0 18px 18px;
+    background: var(--code-bg);
+    border-radius: 14px;
+    padding: 16px 0;
+    font: 400 22px/1.58 var(--font-mono);
+    color: var(--ink);
+}
+.code.sm { font-size: 19.5px; }
+.code.lg { font-size: 25px; }
+.code .l {
+    display: grid;
+    grid-template-columns: 88px 1fr;
+    padding-right: 22px;
+}
+.code .l > i {
+    font-style: normal;
+    color: var(--sub);
+    text-align: right;
+    padding-right: 22px;
+    user-select: none;
+    opacity: 0.8;
+}
+.code .l > span { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.code .l.hl { background: var(--hl); box-shadow: inset 4px 0 0 var(--blue); }
+.code .l.hl > i { color: var(--blue); opacity: 1; }
+.code .l.del { background: var(--del); box-shadow: inset 4px 0 0 var(--alert); }
+.code .l.del > i { color: var(--alert); opacity: 1; }
+.code .l.gap > i { opacity: 0.55; }
+.code .k { font-weight: 700; }
+.code .s { color: var(--str); }
+.code .n { color: var(--num); font-weight: 700; }
+.code .c { color: var(--sub); font-style: italic; }
+.code .m { color: var(--alert); font-weight: 700; }
+
+/* ===========================================
+   REPLY THREAD (our plain-language explanation)
+   =========================================== */
+.thread { display: flex; flex-direction: column; gap: 30px; min-width: 0; }
+.reply {
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    gap: 18px;
+    position: relative;
+}
+.reply + .reply::before {
+    content: "";
+    position: absolute;
+    left: 25px; top: -30px;
+    width: 2px; height: 30px;
+    background: var(--line);
+}
+.av.us { background: transparent; border: 2px solid var(--blue); color: var(--blue); font: 700 17px/1 var(--font-body); }
+.reply.warn .av.us { border-color: var(--alert); color: var(--alert); }
+.reply-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.reply-name { font: 700 21px/1.2 var(--font-body); color: var(--ink); }
+.reply-name span { font-weight: 400; color: var(--sub); }
+.reply-text { font: 400 28px/1.6 var(--font-body); color: var(--ink); }
+.reply-text b { font-weight: 700; }
+
+/* ===========================================
+   SMALL PARTS: pills, tiles, tables
+   =========================================== */
+.pill {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 10px 22px; border-radius: 999px;
+    border: 1px solid var(--line);
+    font: 500 22px/1.2 var(--font-body);
+    color: var(--ink);
+    width: fit-content;
+}
+.pill.blue { background: var(--blue); border-color: var(--blue); color: #FFFFFF; }
+.pill.redline { border-color: var(--alert); color: var(--alert); }
+
+.tiles { display: grid; gap: 24px; }
+.tile {
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 28px 30px;
+    display: flex; flex-direction: column; gap: 12px;
+    min-width: 0;
+}
+.tile-k { font: 500 19px/1.3 var(--font-mono); color: var(--sub); letter-spacing: 0.03em; }
+.tile-t { font: 800 34px/1.25 var(--font-display); color: var(--ink); letter-spacing: -0.01em; }
+.tile-d { font: 400 24px/1.55 var(--font-body); color: var(--sub); }
+.tile-n { font: 800 52px/1 var(--font-display); color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+.cmp { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.cmp th {
+    text-align: left; font: 500 20px/1.2 var(--font-mono); color: var(--sub);
+    padding: 0 24px 16px; border-bottom: 1px solid var(--line); letter-spacing: 0.03em;
+}
+.cmp td {
+    padding: 15px 24px; border-bottom: 1px solid var(--line);
+    font: 400 26px/1.4 var(--font-body); color: var(--ink); vertical-align: middle;
+}
+.cmp td.num { font: 500 27px/1.3 var(--font-mono); }
+.cmp td.num b { color: var(--blue); }
+.cmp .dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 14px; vertical-align: 2px; }
+.src { font: 400 19px/1.5 var(--font-mono); color: var(--sub); }
+
+/* ===========================================
+   REVEAL ANIMATION (staggered on slide entry)
+   =========================================== */
+.reveal {
+    opacity: 0;
+    transform: translateY(26px);
+    transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+}
+.slide.visible .reveal { opacity: 1; transform: none; }
+.slide.visible .d1 { transition-delay: 0.08s; }
+.slide.visible .d2 { transition-delay: 0.2s; }
+.slide.visible .d3 { transition-delay: 0.34s; }
+.slide.visible .d4 { transition-delay: 0.5s; }
+.slide.visible .d5 { transition-delay: 0.66s; }
+
+/* ===========================================
+   SLIDE 1 — TITLE (white page, black 2026 panel slides in)
+   =========================================== */
+.s-title .pad { padding-right: 760px; justify-content: space-between; }
+.s-title h1 {
+    font: 900 118px/1.08 var(--font-display);
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    text-wrap: balance;
+}
+.s-title .subt { font: 400 34px/1.55 var(--font-body); color: var(--sub); max-width: 940px; }
+.s-title .meta { display: flex; flex-direction: column; gap: 10px; font: 400 23px/1.5 var(--font-body); color: var(--sub); }
+.s-title .meta b { color: var(--ink); font-weight: 600; }
+.title-panel {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 640px;
+    transform: translateX(100%);
+    transition: transform 1.3s var(--ease) 0.35s;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 0 72px 140px;
+    gap: 14px;
+}
+.slide.visible .title-panel { transform: none; }
+.title-panel .yr { font: 900 210px/0.9 var(--font-display); letter-spacing: -0.06em; color: var(--ink); }
+.title-panel .repo { font: 400 22px/1.3 var(--font-mono); color: var(--sub); }
+.title-left-yr { font: 900 64px/1 var(--font-display); color: var(--tw-line); letter-spacing: -0.03em; }
+.seam-dot {
+    position: absolute; right: 622px; top: 470px;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--blue);
+    box-shadow: 0 0 0 10px rgba(29, 155, 240, 0.18);
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.6s ease 1.2s;
+}
+.slide.visible .seam-dot { opacity: 1; }
+
+/* ===========================================
+   SECTION DIVIDERS
+   =========================================== */
+.divider .pad { justify-content: center; gap: 30px; }
+.divider .big {
+    font: 900 300px/0.88 var(--font-display);
+    letter-spacing: -0.05em;
+    color: var(--ink);
+    display: flex; align-items: flex-start; gap: 28px;
+}
+.divider .big::after {
+    content: ""; width: 54px; height: 54px; border-radius: 50%;
+    background: var(--blue); margin-top: 28px; flex: none;
+}
+.divider .cap { font: 700 46px/1.3 var(--font-display); color: var(--ink); letter-spacing: -0.02em; }
+.divider .src { font-size: 22px; }
+
+/* ===========================================
+   PIPELINE MAP (slide 4)
+   =========================================== */
+.pipe { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; flex: 1; align-items: stretch; }
+.step {
+    position: relative;
+    padding: 34px 34px 0 0;
+    border-top: 2px solid var(--line);
+    display: flex; flex-direction: column; gap: 16px;
+}
+.step::before {
+    content: ""; position: absolute; top: -13px; left: 0;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--bg); border: 4px solid var(--blue);
+}
+.step .no { font: 500 21px/1 var(--font-mono); color: var(--blue); letter-spacing: 0.05em; }
+.step h3 { font: 800 46px/1.15 var(--font-display); color: var(--ink); letter-spacing: -0.02em; }
+.step p { font: 400 26px/1.55 var(--font-body); color: var(--sub); }
+
+/* ===========================================
+   TIMELINE / MORPH SLIDE (white → black, blue stays)
+   =========================================== */
+.slide.morph {
+    --bg: var(--tw-bg); --ink: var(--tw-ink); --sub: var(--tw-sub); --line: var(--tw-line);
+    color: var(--ink); background: var(--bg);
+}
+.slide.morph.visible { --bg: var(--x-bg); --ink: var(--x-ink); --sub: var(--x-sub); --line: var(--x-line); }
+.slide.morph,
+.slide.morph * {
+    transition-property: background-color, color, border-color, opacity, transform, visibility;
+    transition-duration: 1.6s, 1.6s, 1.6s, 0.7s, 0.7s, 0.55s;
+    transition-timing-function: ease;
+    transition-delay: 1.1s, 1.1s, 1.1s, 0s, 0s, 0s;
+}
+.tl { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 28px; margin-top: 30px; }
+.tl::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 11px;
+    height: 2px; background: var(--line);
+}
+.ev { position: relative; padding-top: 52px; display: flex; flex-direction: column; gap: 12px; }
+.ev::before {
+    content: ""; position: absolute; top: 0; left: 0;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--blue);
+}
+.ev .d { font: 700 26px/1.2 var(--font-mono); color: var(--ink); }
+.ev .t { font: 400 24px/1.5 var(--font-body); color: var(--sub); }
+.ev.key .d { color: var(--blue); }
+.morph-line { font: 800 52px/1.3 var(--font-display); color: var(--ink); letter-spacing: -0.02em; margin-top: auto; max-width: 1400px; }
+
+/* ===========================================
+   SPLIT-ERA SLIDES (left half 2023 white, right half 2026 black)
+   =========================================== */
+.duo { background: linear-gradient(90deg, var(--tw-bg) 0 50%, var(--x-bg) 50% 100%); }
+.half { position: absolute; top: 0; bottom: 0; width: 960px; padding: 76px 80px 124px; display: flex; flex-direction: column; gap: 32px; }
+.half.l { left: 0; }
+.half.r { right: 0; }
+.seam-num {
+    position: absolute; left: 0; right: 0; top: 820px; text-align: center;
+    font: 900 92px/1 var(--font-display); color: var(--blue); letter-spacing: -0.03em;
+    white-space: nowrap; z-index: 3;
+}
+
+/* premises rows (slide 26) */
+.prem { position: absolute; left: 0; right: 0; top: 236px; bottom: 124px; display: flex; flex-direction: column; justify-content: space-between; }
+.prem-row { position: relative; display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+.prem-row .claim {
+    position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+    background: var(--blue); color: #FFFFFF;
+    font: 700 28px/1.2 var(--font-body);
+    padding: 12px 30px; border-radius: 999px; white-space: nowrap;
+}
+.prem-row .ev2 { padding-top: 66px; font: 400 22px/1.5 var(--font-mono); }
+.prem-row .ev2.l { padding-left: 120px; padding-right: 70px; color: var(--tw-sub); }
+.prem-row .ev2.r { padding-left: 70px; padding-right: 120px; color: var(--x-sub); }
+.prem-row .ev2 b { font-weight: 700; color: var(--blue); }
+
+/* ===========================================
+   CHARTS
+   =========================================== */
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; }
+.chart { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.chart h3 { font: 700 28px/1.3 var(--font-body); color: var(--ink); }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .ax { stroke: var(--line); stroke-width: 2; fill: none; }
+.chart .ln { stroke: var(--blue); stroke-width: 5; fill: none; stroke-linejoin: round; }
+.chart .ln.neg { stroke: var(--alert); }
+.chart .pt { fill: var(--blue); }
+.chart .pt.neg { fill: var(--alert); }
+.chart text { font-family: var(--font-mono); font-size: 22px; fill: var(--sub); }
+.chart text.v { font-size: 26px; font-weight: 700; fill: var(--ink); }
+
+.bars { display: flex; flex-direction: column; gap: 18px; }
+.bar-row { display: grid; grid-template-columns: 150px 1fr; gap: 20px; align-items: center; }
+.bar-row .d { font: 500 21px/1.2 var(--font-mono); color: var(--sub); }
+.bar-row .b { display: flex; align-items: center; gap: 16px; font: 700 26px/1 var(--font-mono); color: var(--ink); }
+.bar-row .b i { display: block; height: 30px; background: var(--blue); border-radius: 4px; }
+.bar-row .b.gone { color: var(--alert); font-family: var(--font-body); font-weight: 600; font-size: 24px; }
+
+/* ===========================================
+   VISIBILITY VERDICT MOCKS (slide 21)
+   =========================================== */
+.verdicts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+.vd { border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vd .tag { font: 700 20px/1 var(--font-mono); color: var(--blue); letter-spacing: 0.05em; }
+.vd .mock { height: 92px; border-radius: 10px; background: var(--wash); position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 0 18px; }
+.vd .mock i { display: block; height: 10px; border-radius: 5px; background: var(--line); }
+.vd .mock i:nth-child(2) { width: 70%; }
+.vd .mock .note { position: absolute; left: 0; right: 0; bottom: 0; height: 28px; background: rgba(29, 155, 240, 0.25); font: 500 15px/28px var(--font-body); color: var(--ink); padding-left: 14px; }
+.vd .mock.blur i { filter: blur(6px); }
+.vd .mock .see { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font: 700 16px/1 var(--font-body); color: var(--ink); border: 1px solid var(--sub); border-radius: 999px; padding: 8px 14px; background: var(--bg); }
+.vd .mock.none { background: transparent; border: 2px dashed var(--line); }
+.vd .what { font: 500 23px/1.45 var(--font-body); color: var(--ink); }
+
+/* ===========================================
+   PRESENTATION CHROME (outside the stage)
+   =========================================== */
+.chrome {
+    position: fixed;
+    left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px;
+    background: var(--chrome-bg);
+    border: 1px solid var(--chrome-line);
+    border-radius: 999px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--chrome-ink);
+    font: 500 13px/1 var(--font-mono);
+    opacity: 0.35;
+    transition: opacity 0.3s ease, background-color 0.8s ease, color 0.8s ease, border-color 0.8s ease;
+    max-width: calc(100vw - 32px);
+}
+.chrome:hover, .chrome:focus-within, body.show-chrome .chrome { opacity: 1; }
+.chrome button {
+    appearance: none; border: 0; background: transparent; color: inherit;
+    font: inherit; cursor: pointer; border-radius: 999px; padding: 7px 11px;
+}
+.chrome button:hover { background: var(--chrome-line); }
+.chrome button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.chrome button[aria-pressed="true"] { background: var(--blue); color: #FFFFFF; }
+.chrome .yr { color: var(--chrome-sub); }
+.prog { position: relative; width: 120px; height: 3px; border-radius: 2px; background: var(--chrome-line); }
+.prog b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--blue); border-radius: 2px; transition: width 0.4s var(--ease); }
+#counter { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+#resetEdits[hidden] { display: none !important; }
+
+.notes-panel {
+    position: fixed;
+    left: 50%;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    width: min(1000px, calc(100vw - 32px));
+    max-height: 34vh;
+    overflow: auto;
+    z-index: 999;
+    background: var(--chrome-bg);
+    border: 1px solid var(--chrome-line);
+    border-radius: 16px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 16px 20px;
+    color: var(--chrome-ink);
+    font: 400 16px/1.65 var(--font-body);
+}
+.notes-panel strong { display: block; font: 500 12px/1 var(--font-mono); color: var(--blue); letter-spacing: 0.06em; margin-bottom: 8px; }
+
+body.editing [contenteditable="true"] { outline: 2px dashed rgba(29, 155, 240, 0.6); outline-offset: 4px; border-radius: 4px; }
+body.editing [contenteditable="true"]:focus { outline-style: solid; }
+</style>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage" aria-live="polite">
+
+<!-- =========================================================
+     1. TITLE
+     ========================================================= -->
+<section class="slide s-title era-tw active visible" data-era="tw" aria-label="표지">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">뉴스 큐레이션 · 팀 발표</span><span>2026. 11.</span></div>
+        <div class="head">
+            <h1 class="reveal d2">편집자는<br>숫자 속으로<br>들어갔다</h1>
+            <p class="subt reveal d3">트위터(2023)와 X(2026)가 공개한 추천 알고리즘 코드를 직접 읽고, 큐레이션이 3년 동안 어떻게 바뀌었고 무엇은 그대로인지 살펴봅니다.</p>
+        </div>
+        <div class="meta reveal d4">
+            <span class="title-left-yr">2023</span>
+            <span><b>발표</b> ○○○ · ○○○ · ○○○ · ○○○</span>
+        </div>
+    </div>
+    <div class="title-panel era-x">
+        <span class="yr">2026</span>
+        <span class="repo">twitter/the-algorithm → xai-org/x-algorithm</span>
+    </div>
+    <span class="seam-dot" aria-hidden="true"></span>
+    <aside class="notes">오늘 발표는 기사나 보도가 아니라 두 회사가 직접 공개한 추천 알고리즘 코드를 읽고 비교한 결과입니다. 왼쪽 흰 화면이 2023년 트위터, 오른쪽 검은 화면이 2026년 X입니다. 가운데 파란 점은 두 시기에 공통으로 남은 것, 오늘 결론의 상징입니다.</aside>
+</section>
+
+<!-- =========================================================
+     2. QUESTION
+     ========================================================= -->
+<section class="slide era-tw" data-era="tw" aria-label="추천 탭은 누가 편집할까">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">들어가며</span><span>큐레이션이란</span></div>
+        <div class="head reveal d2">
+            <h2 class="title">‘추천’ 탭은 누가 편집할까</h2>
+            <p class="lead">신문 1면은 편집국이 만든다. 매일 보는 추천 피드도 누군가 모으고, 고르고, 빼고, 배치한 결과다.</p>
+        </div>
+        <div class="tiles reveal d3" style="grid-template-columns: 1fr 1fr;">
+            <div class="tile">
+                <span class="tile-k">신문 편집국</span>
+                <span class="tile-t">사람이 회의로 정한다</span>
+                <span class="tile-d">기사를 모으고(취재) · 뉴스 가치를 판단하고 · 싣지 않을 기사를 빼고 · 지면에 배치한다</span>
+            </div>
+            <div class="tile">
+                <span class="tile-k">추천 알고리즘</span>
+                <span class="tile-t">코드와 숫자가 정한다</span>
+                <span class="tile-d">후보 글을 모으고 · 점수를 매기고 · 걸러내고 · 섞어서 배치한다</span>
+            </div>
+        </div>
+        <p class="reply-text reveal d4" style="font-size: 34px; font-weight: 600; margin-top: auto;">하는 일은 같다. 바뀐 건 <span class="em">누가, 어떤 기준으로</span> 하느냐다.</p>
+    </div>
+    <aside class="notes">큐레이션을 ‘모으고, 고르고, 빼고, 배치하는 일’로 정의하고 시작합니다. 신문은 사람이 이 일을 하고, 추천 탭은 코드가 합니다. 오늘 질문은 그 코드 안에 사람의 판단이 얼마나 남아 있느냐입니다.</aside>
+</section>
+
+<!-- =========================================================
+     3. SOURCES WE READ
+     ========================================================= -->
+<section class="slide era-tw" data-era="tw" aria-label="우리가 직접 읽은 코드">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">자료</span><span>보도가 아니라 원본</span></div>
+        <div class="head reveal d2">
+            <h2 class="title">우리가 직접 읽은 코드</h2>
+            <p class="lead">두 회사가 GitHub에 공개한 저장소를 내려받아 코드와 변경 이력을 확인했다.</p>
+        </div>
+        <div class="tiles reveal d3" style="grid-template-columns: 1fr 1fr;">
+            <div class="post">
+                <div class="post-head"><span class="av tw">tw</span><div class="who"><b>twitter/the-algorithm</b><span>+ twitter/the-algorithm-ml</span></div><span class="when">2023.03.31</span></div>
+                <div class="tile" style="border: 0; padding-top: 6px;">
+                    <span class="tile-n">5,364<span style="font-size: 26px; color: var(--sub); font-weight: 600;"> 개 파일</span></span>
+                    <span class="tile-d">일론 머스크 인수 약 5개월 뒤 공개. 주로 Scala·Java. 2023년 7월까지 몇 차례 갱신하고, 2025년 9월에 X가 한 번 더 갱신했다.</span>
+                </div>
+            </div>
+            <div class="post era-x">
+                <div class="post-head"><span class="av x">X</span><div class="who"><b>xai-org/x-algorithm</b><span>xAI가 새로 만든 저장소</span></div><span class="when">2026.01.20</span></div>
+                <div class="tile" style="border: 0; padding-top: 6px;">
+                    <span class="tile-n">79 → 2,364<span style="font-size: 26px; color: var(--sub); font-weight: 600;"> 개 파일</span></span>
+                    <span class="tile-d">1월 79개로 시작해 8월 2,016개로 확대. 주로 Rust·Python. 8월부터 거의 매일 갱신 중이다(분석 기준 11월 4일).</span>
+                </div>
+            </div>
+        </div>
+        <p class="src reveal d4">공개된 코드는 실제 운영 코드와 다를 수 있다. 이 발표의 모든 주장은 “공개 코드에 이렇게 적혀 있다”는 뜻이다.</p>
+    </div>
+    <aside class="notes">자료는 두 저장소입니다. 2023년 트위터 저장소는 파일 5천여 개, 2026년 X 저장소는 1월에 79개로 시작해 지금은 2천 3백여 개입니다. X 저장소는 지금도 거의 매일 바뀌어서 11월 4일 버전을 기준으로 삼았습니다.</aside>
+</section>
+
+<!-- =========================================================
+     4. PIPELINE MAP
+     ========================================================= -->
+<section class="slide era-tw" data-era="tw" aria-label="추천 피드가 만들어지는 4단계">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">비교의 틀</span><span>두 시스템 공통 구조</span></div>
+        <div class="head reveal d2">
+            <h2 class="title">추천 피드가 만들어지는 4단계</h2>
+            <p class="lead">2023 트위터와 2026 X 모두 이 순서로 피드를 만든다. 이 틀로 둘을 비교한다.</p>
+        </div>
+        <div class="pipe reveal d3">
+            <div class="step"><span class="no">1단계</span><h3>모으기</h3><p>볼 만한 후보 글을 수천 개 모은다. 팔로우한 사람 글과 모르는 사람 글을 함께.</p></div>
+            <div class="step"><span class="no">2단계</span><h3>점수 매기기</h3><p>글마다 ‘이 사람이 반응할 확률’을 예측하고, 행동별 가중치를 곱해 점수를 낸다.</p></div>
+            <div class="step"><span class="no">3단계</span><h3>거르기</h3><p>차단·뮤트한 계정, 규정 위반 라벨이 붙은 글, 이미 본 글을 뺀다.</p></div>
+            <div class="step"><span class="no">4단계</span><h3>섞고 배치하기</h3><p>같은 사람 글이 몰리지 않게 섞고, 광고와 계정 추천을 사이사이 끼워 넣는다.</p></div>
+        </div>
+    </div>
+    <aside class="notes">추천 피드는 모으기, 점수 매기기, 거르기, 섞고 배치하기의 네 단계로 만들어집니다. 신문으로 치면 취재, 가치 판단, 게재 거부, 지면 배치에 해당합니다.</aside>
+</section>
+
+<!-- =========================================================
+     5. PART 1 DIVIDER — 2023
+     ========================================================= -->
+<section class="slide divider era-tw" data-era="tw" aria-label="2023 트위터">
+    <div class="pad">
+        <div class="big reveal d1">2023</div>
+        <div class="cap reveal d2">트위터가 처음 공개한 추천 코드</div>
+        <div class="src reveal d3">2023.03.31 · github.com/twitter/the-algorithm · 커밋 ef4c5eb</div>
+    </div>
+    <aside class="notes">먼저 2023년 트위터입니다. 인수 직후, 투명성을 내세워 추천 코드를 처음 공개한 시점입니다.</aside>
+</section>
+
+<!-- =========================================================
+     6. 2023 — GATHER
+     ========================================================= -->
+<section class="slide era-tw" data-era="tw" aria-label="2023 모으기">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2023 · 트위터</span><span>1단계 모으기</span></div>
+        <div class="head reveal d2"><h2 class="title">절반은 내가 팔로우한 사람에게서 온다</h2></div>
+        <div class="split">
+            <div class="post reveal d3">
+                <div class="post-head"><span class="av tw">tw</span><div class="who"><b>twitter/the-algorithm</b><span>README.md · 13, 20번째 줄</span></div><span class="when">2023.03.31</span></div>
+                <div class="code sm">
+                    <div class="l"><i>13</i><span>| Feature | [simclusters-ann](simclusters-ann/README.md) | Community detection and sparse embeddings into those communities. |</span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l hl"><i>20</i><span>| Candidate Source | [search-index](src/java/com/twitter/search/README.md) | Find and rank In-Network Tweets. <span class="n">~50%</span> of Tweets come from this candidate source. |</span></div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면 <span>· 20번째 줄</span></span>
+                    <p class="reply-text">추천 탭 글의 <span class="em">약 50%</span>는 내가 팔로우한 계정의 글이다. 나머지는 나와 비슷한 사람들이 반응한 글을 따라 찾아온 ‘모르는 사람’의 글이다.</p></div>
+                </div>
+                <div class="reply reveal d5">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">13번째 줄</span>
+                    <p class="reply-text">모르는 사람 글을 찾는 장치 중 하나가 <b>관심사 묶음(SimClusters)</b>이다. 비슷한 것에 반응하는 계정끼리 묶어 둔다. 이 부품은 2026년에도 그대로 쓰인다.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">2023년 설명서에는 추천 글의 약 절반이 팔로우한 계정에서 온다고 적혀 있습니다. 나머지 절반은 관심사 묶음 같은 장치로 찾은 모르는 사람의 글입니다. 이 관심사 묶음은 3년 뒤에도 등장하니 기억해 주세요.</aside>
+</section>
+
+<!-- =========================================================
+     7. 2023 — SCORE
+     ========================================================= -->
+<section class="slide era-tw" data-era="tw" aria-label="2023 점수 매기기">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2023 · 트위터</span><span>2단계 점수 매기기</span></div>
+        <div class="head reveal d2"><h2 class="title">점수 = 반응할 확률 × 회사가 정한 가중치</h2></div>
+        <div class="split">
+            <div class="post reveal d3">
+                <div class="post-head"><span class="av tw">tw</span><div class="who"><b>twitter/the-algorithm-ml</b><span>projects/home/recap/README.md · 31–45</span></div><span class="when">2023.04.05</span></div>
+                <div class="code sm">
+                    <div class="l"><i>31</i><span>scored_tweets_model_weight_fav: <span class="n">0.5</span></span></div>
+                    <div class="l"><i>32</i><span>scored_tweets_model_weight_retweet: <span class="n">1.0</span></span></div>
+                    <div class="l"><i>33</i><span>scored_tweets_model_weight_reply: <span class="n">13.5</span></span></div>
+                    <div class="l"><i>34</i><span>scored_tweets_model_weight_good_profile_click: <span class="n">12.0</span></span></div>
+                    <div class="l"><i>35</i><span>scored_tweets_model_weight_video_playback50: <span class="n">0.005</span></span></div>
+                    <div class="l hl"><i>36</i><span>scored_tweets_model_weight_reply_engaged_by_author: <span class="n">75.0</span></span></div>
+                    <div class="l"><i>37</i><span>scored_tweets_model_weight_good_click: <span class="n">11.0</span></span></div>
+                    <div class="l"><i>38</i><span>scored_tweets_model_weight_good_click_v2: <span class="n">10.0</span></span></div>
+                    <div class="l"><i>39</i><span>scored_tweets_model_weight_negative_feedback_v2: <span class="m">-74.0</span></span></div>
+                    <div class="l del"><i>40</i><span>scored_tweets_model_weight_report: <span class="m">-369.0</span></span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l"><i>45</i><span>score = sum_i { (weight of engagement i) * (probability of engagement i) }</span></div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면 <span>· 45번째 줄</span></span>
+                    <p class="reply-text">AI가 ‘내가 이 글에 좋아요를 누를 확률’, ‘답글을 달 확률’ 같은 걸 예측한다. 여기에 회사가 정한 가중치를 곱해 더한 값이 그 글의 점수다.</p></div>
+                </div>
+                <div class="reply reveal d5">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">36, 40번째 줄</span>
+                    <p class="reply-text">가장 크게 쳐준 건 <span class="em">작성자가 다시 반응해 준 답글(75)</span>, 가장 크게 깎은 건 <span class="red">신고(−369)</span>. 2023년 트위터가 좋은 글로 본 건 <b>대화가 이어지는 글</b>이다.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">점수 공식은 단순합니다. 반응할 확률에 가중치를 곱해 더합니다. 2023년 가중치를 보면 작성자가 직접 답해 주는 답글이 75로 가장 높고, 신고가 −369로 가장 낮습니다. 대화를 가장 중요하게 본 셈입니다. 단, 이 숫자는 개수가 아니라 확률에 곱하는 값이라 “답글 하나가 좋아요 150개”처럼 읽으면 안 됩니다.</aside>
+</section>
+
+<!-- =========================================================
+     8. 2023 — HUMAN RULE: PAID VERIFICATION
+     ========================================================= -->
+<section class="slide era-tw" data-era="tw" aria-label="유료 인증 계정 우대">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2023 · 트위터</span><span>사람이 정한 규칙 ①</span></div>
+        <div class="head reveal d2"><h2 class="title">돈을 낸 계정의 글은 점수 4배</h2></div>
+        <div class="split">
+            <div class="post reveal d3">
+                <div class="post-head"><span class="av tw">tw</span><div class="who"><b>twitter/the-algorithm</b><span>home-mixer/…/param/HomeGlobalParams.scala · 89–100</span></div><span class="when">2023.03.31</span></div>
+                <div class="code sm">
+                    <div class="l"><i>89</i><span>  <span class="k">object</span> BlueVerifiedAuthorInNetworkMultiplierParam</span></div>
+                    <div class="l"><i>90</i><span>      <span class="k">extends</span> FSBoundedParam[Double](</span></div>
+                    <div class="l"><i>91</i><span>        name = <span class="s">"home_mixer_blue_verified_author_in_network_multiplier"</span>,</span></div>
+                    <div class="l hl"><i>92</i><span>        default = <span class="n">4.0</span>,</span></div>
+                    <div class="l"><i>93</i><span>        min = 0.0,</span></div>
+                    <div class="l"><i>94</i><span>        max = 100.0</span></div>
+                    <div class="l"><i>95</i><span>      )</span></div>
+                    <div class="l"><i>96</i><span> </span></div>
+                    <div class="l"><i>97</i><span>  <span class="k">object</span> BlueVerifiedAuthorOutOfNetworkMultiplierParam</span></div>
+                    <div class="l"><i>98</i><span>      <span class="k">extends</span> FSBoundedParam[Double](</span></div>
+                    <div class="l"><i>99</i><span>        name = <span class="s">"home_mixer_blue_verified_author_out_of_network_multiplier"</span>,</span></div>
+                    <div class="l hl"><i>100</i><span>        default = <span class="n">2.0</span>,</span></div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면 <span>· 92, 100번째 줄</span></span>
+                    <p class="reply-text">유료 인증(트위터 블루) 계정의 글은 내가 팔로우 중이면 점수 <span class="em">×4</span>, 팔로우하지 않아도 <span class="em">×2</span>. AI가 배운 게 아니라 사람이 정해 넣은 규칙이다.</p></div>
+                </div>
+                <div class="reply reveal d5">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">그 뒤</span>
+                    <p class="reply-text">2023년 7월 갱신본에도 같은 값이 남아 있다가, 2025년 9월 공개본에서는 이 규칙이 보이지 않는다.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">가장 직접적인 사람의 개입입니다. 유료 인증 계정의 글은 점수를 4배, 2배로 올려 줬습니다. 돈을 낸 사람의 목소리를 더 크게 키운 편집 방침이 코드 한 줄로 들어가 있었습니다. 이 규칙이 2026년에 어떻게 됐는지는 뒤에서 다룹니다.</aside>
+</section>
+
+<!-- =========================================================
+     9. 2023 — HUMAN RULE: 0.75 / 0.5 / 0.25
+     ========================================================= -->
+<section class="slide era-tw" data-era="tw" aria-label="모르는 사람 글 할인과 작성자 감쇠">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2023 · 트위터</span><span>사람이 정한 규칙 ②</span></div>
+        <div class="head reveal d2"><h2 class="title">모르는 사람 글은 25% 깎고, 같은 사람 글은 연달아 줄인다</h2></div>
+        <div class="split">
+            <div class="stack">
+                <div class="post reveal d3">
+                    <div class="post-head"><span class="av tw">tw</span><div class="who"><b>OONTweetScalingScorer.scala</b><span>home-mixer/…/scorer · 17–34</span></div><span class="when">2023.03.31</span></div>
+                    <div class="code sm">
+                        <div class="l"><i>17</i><span><span class="c"> * Scales scores of each out-of-network tweet by the specified scale factor</span></span></div>
+                        <div class="l gap"><i>⋮</i><span></span></div>
+                        <div class="l hl"><i>25</i><span>  <span class="k">private val</span> ScaleFactor = <span class="n">0.75</span></span></div>
+                        <div class="l gap"><i>⋮</i><span></span></div>
+                        <div class="l"><i>34</i><span>        <span class="k">val</span> updatedScore = <span class="k">if</span> (selector(candidate)) score.map(_ * ScaleFactor) <span class="k">else</span> score</span></div>
+                    </div>
+                </div>
+                <div class="post reveal d4">
+                    <div class="post-head"><span class="av tw">tw</span><div class="who"><b>DiversityDiscountProvider.scala</b><span>home-mixer/…/scored_tweets/scorer · 21–29</span></div><span class="when">2023.03.31</span></div>
+                    <div class="code sm">
+                        <div class="l hl"><i>21</i><span>  <span class="k">private val</span> Decay = <span class="n">0.5</span></span></div>
+                        <div class="l hl"><i>22</i><span>  <span class="k">private val</span> Floor = <span class="n">0.25</span></span></div>
+                        <div class="l gap"><i>⋮</i><span></span></div>
+                        <div class="l"><i>29</i><span>    score * ((1 - Floor) * Math.pow(Decay, position) + Floor)</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면 <span>· 25번째 줄</span></span>
+                    <p class="reply-text">팔로우하지 않은 사람의 글은 점수에 <span class="em">0.75</span>를 곱한다. 아는 사람 글을 조금 더 믿는다는 뜻이다.</p></div>
+                </div>
+                <div class="reply reveal d5">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">21–22번째 줄</span>
+                    <p class="reply-text">같은 사람 글이 여러 개면 두 번째부터 <span class="em">절반(0.5)</span>씩 줄인다. 다만 원래 점수의 <span class="em">4분의 1(0.25)</span> 아래로는 내리지 않는다. 한 사람이 피드를 독차지하지 못하게 하는 장치다.</p></div>
+                </div>
+                <span class="pill blue reveal d5">0.75 · 0.5 · 0.25 — 이 세 숫자를 기억해 두자</span>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">두 번째 사람의 규칙입니다. 모르는 사람의 글은 0.75배, 같은 사람의 글은 두 번째부터 절반씩 줄이되 4분의 1 밑으로는 안 내립니다. 0.75, 0.5, 0.25. 이 세 숫자가 3년 뒤 X 코드에서 그대로 나옵니다.</aside>
+</section>
+
+<!-- =========================================================
+     10. 2023 — MEASURING SPECIFIC ACCOUNTS
+     ========================================================= -->
+<section class="slide era-tw" data-era="tw" aria-label="특정 계정 노출 측정">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2023 · 트위터</span><span>사람이 정한 규칙 ③</span></div>
+        <div class="head reveal d2"><h2 class="title">머스크·민주당·공화당 계정은 따로 셌다</h2></div>
+        <div class="split" style="grid-template-columns: 1.3fr 0.7fr; gap: 56px;">
+            <div class="stack" style="gap: 20px;">
+                <div class="post reveal d3">
+                    <div class="post-head"><span class="av tw">tw</span><div class="who"><b>HomeTweetTypePredicates.scala</b><span>공개 당일 삭제된 줄 · 커밋 ec83d01</span></div><span class="when">2023.03.31</span></div>
+                    <div class="code sm" style="font-size: 18.5px;">
+                        <div class="l del"><i>225</i><span>      <span class="s">"author_is_elon"</span>,</span></div>
+                        <div class="l del"><i>228</i><span>          .getOrElse(AuthorIdFeature, None).contains(candidate.getOrElse(DDGStatsElonFeature, 0L))),</span></div>
+                        <div class="l gap"><i>⋮</i><span></span></div>
+                        <div class="l del"><i>230</i><span>      <span class="s">"author_is_power_user"</span>,</span></div>
+                        <div class="l del"><i>236</i><span>      <span class="s">"author_is_democrat"</span>,</span></div>
+                        <div class="l del"><i>242</i><span>      <span class="s">"author_is_republican"</span>,</span></div>
+                    </div>
+                </div>
+                <div class="post reveal d4">
+                    <div class="post-head"><span class="av tw">tw</span><div class="who"><b>RequestQueryFeatureHydrator.scala</b><span>같은 커밋에서 삭제된 설명 · 87–90</span></div><span class="when">2023.03.31</span></div>
+                    <div class="code sm" style="font-size: 18.5px;">
+                        <div class="l del"><i>87</i><span><span class="c">* These author ID lists are used purely for metrics collection. We track how often we are</span></span></div>
+                        <div class="l del"><i>88</i><span><span class="c">* serving Tweets from these authors and how often their tweets are being impressed by users.</span></span></div>
+                        <div class="l del"><i>89</i><span><span class="c">* This helps us validate in our A/B experimentation platform that we do not ship changes</span></span></div>
+                        <div class="l del"><i>90</i><span><span class="c">* that negatively impacts one group over others.</span></span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면</span>
+                    <p class="reply-text">일론 머스크 계정, 영향력 큰 계정, 민주당·공화당 계정 목록을 두고 이들 글이 얼마나 노출되는지 셌다. 공개 당일 “특정 사용자 그룹의 노출 통계 코드 삭제”라는 커밋으로 지워졌다.</p></div>
+                </div>
+                <div class="reply warn reveal d5">
+                    <span class="av us">주의</span>
+                    <div class="reply-body"><span class="reply-name">87–90번째 줄</span>
+                    <p class="reply-text">설명에는 <b>‘측정용’</b>이라고 적혀 있다. 실험이 한쪽 집단에 불리하지 않은지 확인하려는 장치다. <b>순위를 올려 주는 코드는 아니었다.</b></p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">보도로 유명해진 부분입니다. 머스크 계정, 영향력 큰 계정, 양당 정치인 계정의 노출을 따로 셌고, 공개 당일 이 코드를 지웠습니다. 다만 코드 설명은 측정용이라고 밝히고 있어서, ‘머스크 글을 띄워 주는 코드’라고 말하면 틀립니다. 특정 집단이 실험에서 불리해지지 않는지 감시하는 장치였습니다.</aside>
+</section>
+
+<!-- =========================================================
+     11. 2023 — TRANSPARENCY
+     ========================================================= -->
+<section class="slide era-tw" data-era="tw" aria-label="2023 투명성">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2023 · 트위터</span><span>공개의 범위</span></div>
+        <div class="head reveal d2"><h2 class="title">진짜 숫자는 코드 밖에, 거르는 코드는 일부만</h2></div>
+        <div class="split">
+            <div class="stack">
+                <div class="post reveal d3">
+                    <div class="post-head"><span class="av tw">tw</span><div class="who"><b>ScoredTweetsParam.scala</b><span>home-mixer/…/scored_tweets/param · 86–92</span></div><span class="when">2023.03.31</span></div>
+                    <div class="code sm">
+                        <div class="l"><i>86</i><span>      <span class="k">object</span> FavParam</span></div>
+                        <div class="l"><i>87</i><span>          <span class="k">extends</span> FSBoundedParam[Double](</span></div>
+                        <div class="l"><i>88</i><span>            name = <span class="s">"scored_tweets_model_weight_fav"</span>,</span></div>
+                        <div class="l hl"><i>89</i><span>            default = <span class="n">1.0</span>,</span></div>
+                        <div class="l"><i>90</i><span>            min = 0.0,</span></div>
+                        <div class="l"><i>91</i><span>            max = 100.0</span></div>
+                        <div class="l"><i>92</i><span>          )</span></div>
+                    </div>
+                </div>
+                <div class="post reveal d4">
+                    <div class="post-head"><span class="av tw">tw</span><div class="who"><b>visibilitylib/README.md</b><span>거르기(노출 차단) 설명서 · 9</span></div><span class="when">2023.03.31</span></div>
+                    <div class="code sm">
+                        <div class="l hl"><i>9</i><span>Visibility Filtering library is currently being reviewed and rebuilt, and part of the code has been removed and is not ready to be shared yet. The remaining part of the code needs further review and will be shared once it’s ready. Also code comments have been sanitized.</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">89번째 줄</span>
+                    <p class="reply-text">코드 속 가중치는 모두 <span class="em">1.0</span>으로 비어 있었다. 실제 숫자(0.5, 13.5, 75…)는 운영 설정에 따로 있었고, 공개 5일 뒤 설명서에 한 번 적었다.</p></div>
+                </div>
+                <div class="reply reveal d5">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">9번째 줄</span>
+                    <p class="reply-text">무엇을 숨길지 정하는 코드는 “일부를 삭제했고 아직 공유할 준비가 안 됐다, 주석도 정리했다”고 스스로 밝혔다. 2023년 공개는 <b>한 번의 공개</b>였다.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">2023년 공개에는 빈틈이 있었습니다. 코드 속 가중치는 전부 1.0이었고, 진짜 숫자는 설명서에 따로 적혔습니다. 무엇을 숨길지 정하는 코드는 일부가 빠진 채 공개됐습니다. 이제 3년을 건너 2026년으로 가 보겠습니다.</aside>
+</section>
+
+<!-- =========================================================
+     12. TRANSITION — white turns black, blue stays
+     ========================================================= -->
+<section class="slide morph" data-era="morph" aria-label="2023에서 2026까지">
+    <div class="pad">
+        <div class="topbar"><span class="era-tag">2023 → 2026</span><span>두 번의 공개 사이</span></div>
+        <div class="head"><h2 class="title">3년, 두 번의 공개</h2></div>
+        <div class="tl">
+            <div class="ev key"><span class="d">2023.03.31</span><span class="t">트위터, 추천 코드 첫 공개</span></div>
+            <div class="ev"><span class="d">2023.07.13</span><span class="t">마지막 정기 갱신</span></div>
+            <div class="ev"><span class="d">2025.09.03</span><span class="t">X가 옛 저장소를 한 번 갱신하고 이름을 트위터에서 X로</span></div>
+            <div class="ev key"><span class="d">2026.01.20</span><span class="t">xAI가 새 저장소 공개, 파일 79개</span></div>
+            <div class="ev"><span class="d">2026.08.13</span><span class="t">파일 2,016개로 확대, 가중치·거르기 규칙 공개</span></div>
+            <div class="ev"><span class="d">2026.11.04</span><span class="t">거의 매일 갱신 중, 이 발표의 기준 시점</span></div>
+        </div>
+        <p class="morph-line">배경은 흰색에서 검은색이 됐지만, 파란색은 그대로다.</p>
+    </div>
+    <aside class="notes">잠시 기다리면 화면이 흰색에서 검은색으로 바뀝니다. 트위터가 X가 된 3년입니다. 그런데 파란 점은 색이 바뀌지 않습니다. 오늘 발표의 결론도 같습니다. 겉은 크게 바뀌었지만 바뀌지 않은 기준이 있습니다.</aside>
+</section>
+
+<!-- =========================================================
+     13. PART 2 DIVIDER — 2026 + the January claim
+     ========================================================= -->
+<section class="slide divider era-x" data-era="x" aria-label="2026 X">
+    <div class="pad">
+        <div class="big reveal d1">2026</div>
+        <div class="cap reveal d2">xAI가 다시 공개한 추천 코드, 그리고 1월의 선언</div>
+        <div class="post reveal d3" style="max-width: 1500px;">
+            <div class="post-head"><span class="av x">X</span><div class="who"><b>xai-org/x-algorithm</b><span>README.md · 34번째 줄 · 커밋 aaa167b</span></div><span class="when">2026.01.20</span></div>
+            <div class="code lg">
+                <div class="l hl"><i>34</i><span>We have eliminated every single hand-engineered feature and most heuristics from the system.</span></div>
+            </div>
+        </div>
+        <p class="reply-text reveal d4" style="color: var(--sub);">“사람이 손으로 만든 특징은 전부, 경험으로 정한 규칙은 대부분 없앴다.” <span class="red">이 문장은 2026년 8월 13일 설명서에서 사라졌다.</span></p>
+    </div>
+    <aside class="notes">2026년 1월, X는 새 저장소를 열면서 “사람이 손으로 만든 특징은 전부, 규칙은 대부분 없앴다, AI가 다 한다”고 선언했습니다. 그런데 8월에 코드가 2천 개 파일로 늘어나면서 이 문장은 설명서에서 사라졌습니다. 그 사이 무엇이 드러났는지 보겠습니다.</aside>
+</section>
+
+<!-- =========================================================
+     14. 2026 — GATHER
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="2026 모으기">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2026 · X</span><span>1단계 모으기</span></div>
+        <div class="head reveal d2"><h2 class="title">후보는 네 군데서 온다</h2></div>
+        <div class="tiles reveal d3" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="tile"><span class="tile-k">팔로우한 계정</span><span class="tile-n">1,200</span><span class="tile-d">팔로우한 사람들의 최근 글을 메모리에 들고 있다가 꺼낸다.</span></div>
+            <div class="tile"><span class="tile-k">AI 검색</span><span class="tile-n">1,000</span><span class="tile-d">나와 글을 같은 공간의 좌표로 바꿔, 가까운 글을 찾는다.</span></div>
+            <div class="tile"><span class="tile-k">관심사 묶음</span><span class="tile-n" style="color: var(--blue);">2023</span><span class="tile-d">2023년 부품(SimClusters)이 그대로 돌아왔다.</span></div>
+            <div class="tile"><span class="tile-k">인기글 목록</span><span class="tile-n">500</span><span class="tile-d">“처음엔 팔로워가 가장 많은 활동 계정에서” 뽑는다고만 적혀 있다.</span></div>
+        </div>
+        <div class="reply reveal d4" style="max-width: 1500px;">
+            <span class="av us">해설</span>
+            <div class="reply-body"><span class="reply-name">쉽게 말하면 <span>· 숫자는 최대 개수, param.rs 23–28, 4–9, 1111–1116번째 줄</span></span>
+            <p class="reply-text">모으는 구조는 2023년과 비슷하다. 새로 생긴 <b>인기글 목록</b>은 누가 ‘인기 작성자’인지 정하는 코드가 공개되지 않았다. 바깥 저장소에서 목록을 읽어 오기만 한다.</p></div>
+        </div>
+    </div>
+    <aside class="notes">2026년에는 네 군데서 후보를 모읍니다. 팔로우한 계정, AI 검색, 2023년의 관심사 묶음, 그리고 인기글 목록입니다. 인기글 목록을 누가 어떻게 정하는지는 코드에 없습니다. 공개에도 빈칸이 있다는 첫 사례입니다.</aside>
+</section>
+
+<!-- =========================================================
+     15. 2026 — SCORE
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="2026 점수 매기기">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2026 · X</span><span>2단계 점수 매기기</span></div>
+        <div class="head reveal d2"><h2 class="title">공식은 그대로, 쳐주는 행동이 바뀌었다</h2></div>
+        <div class="split">
+            <div class="post reveal d3">
+                <div class="post-head"><span class="av x">X</span><div class="who"><b>xai-org/x-algorithm</b><span>home-mixer/params/param.rs · 402–520</span></div><span class="when">2026.11.03</span></div>
+                <div class="code sm">
+                    <div class="l"><i>402</i><span><span class="k">param!</span>(FavoriteWeight, f64, <span class="s">"rust_home_mixer_favorite_weight"</span>, <span class="n">0.66</span>);</span></div>
+                    <div class="l"><i>403</i><span><span class="k">param!</span>(ReplyWeight, f64, <span class="s">"rust_home_mixer_reply_weight"</span>, <span class="n">5.0</span>);</span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l"><i>416</i><span><span class="k">param!</span>(RetweetWeight, f64, <span class="s">"rust_home_mixer_retweet_weight"</span>, <span class="n">1.0</span>);</span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l"><i>438</i><span><span class="k">param!</span>(ShareWeight, f64, <span class="s">"rust_home_mixer_share_weight"</span>, <span class="n">2.0</span>);</span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l"><i>445</i><span><span class="k">param!</span>(</span></div>
+                    <div class="l"><i>446</i><span>    ShareViaCopyLinkWeight,</span></div>
+                    <div class="l"><i>447</i><span>    f64,</span></div>
+                    <div class="l"><i>448</i><span>    <span class="s">"rust_home_mixer_share_via_copy_link_weight"</span>,</span></div>
+                    <div class="l hl"><i>449</i><span>    <span class="n">20.0</span></span></div>
+                    <div class="l"><i>450</i><span>);</span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l del"><i>520</i><span><span class="k">param!</span>(ReportWeight, f64, <span class="s">"rust_home_mixer_report_weight"</span>, <span class="m">-234.0</span>);</span></div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면 <span>· README 365번째 줄</span></span>
+                    <p class="reply-text">X 설명서의 공식은 <b>최종 점수 = Σ(가중치 × 행동할 확률)</b>. 2023년과 같다. AI 모델은 일론 머스크의 xAI가 만든 Grok 계열로 바뀌었다.</p></div>
+                </div>
+                <div class="reply reveal d5">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">449번째 줄</span>
+                    <p class="reply-text">예측하는 행동이 10가지에서 20가지 넘게 늘었다. DM 공유, <span class="em">링크 복사(20)</span>, 머문 시간까지. 링크를 복사해 밖으로 가져가는 행동이 가장 무겁다.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">2026년의 점수 공식도 확률 곱하기 가중치의 합으로 같습니다. AI 모델은 Grok 계열로 바뀌었고, 예측하는 행동은 20가지가 넘습니다. 눈에 띄는 건 링크 복사가 20으로 가장 무겁다는 점입니다.</aside>
+</section>
+
+<!-- =========================================================
+     16. WEIGHTS COMPARED
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="가중치 비교">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2023 ↔ 2026</span><span>2단계 점수 매기기</span></div>
+        <div class="head reveal d2"><h2 class="title">‘좋은 글’의 기준이 바뀌었다</h2></div>
+        <table class="cmp reveal d3">
+            <thead><tr><th>행동</th><th>2023 트위터</th><th>2026 X</th><th>읽는 법</th></tr></thead>
+            <tbody>
+                <tr><td><span class="dot" style="background: var(--like);"></span>좋아요</td><td class="num">0.5</td><td class="num">0.66</td><td>조금 올랐다</td></tr>
+                <tr><td><span class="dot" style="background: var(--repost);"></span>리트윗(재게시)</td><td class="num">1.0</td><td class="num">1.0</td><td>그대로</td></tr>
+                <tr><td><span class="dot" style="background: var(--blue);"></span>답글</td><td class="num">13.5</td><td class="num">5.0 <b>+15</b></td><td>맞팔 상대의 글이면 15를 더 얹는다</td></tr>
+                <tr><td><span class="dot" style="background: var(--blue);"></span>작성자가 반응한 답글</td><td class="num"><b>75.0</b></td><td class="num">—</td><td>2023 최고값, 2026엔 항목 없음</td></tr>
+                <tr><td><span class="dot" style="background: var(--repost);"></span>링크 복사 공유</td><td class="num">—</td><td class="num"><b>20.0</b></td><td>2026 최고값</td></tr>
+                <tr><td><span class="dot" style="background: var(--repost);"></span>DM으로 공유</td><td class="num">—</td><td class="num">5.0</td><td>새로 생겼다</td></tr>
+                <tr><td><span class="dot" style="background: var(--alert);"></span>관심없음 · 뮤트 · 차단</td><td class="num">−74.0</td><td class="num">−52.272 · −58.8 · −31.2</td><td>하나로 묶었던 것을 셋으로 나눴다</td></tr>
+                <tr><td><span class="dot" style="background: var(--alert);"></span>신고</td><td class="num">−369.0</td><td class="num">−234.0</td><td>여전히 가장 크게 깎는다</td></tr>
+            </tbody>
+        </table>
+        <div class="reveal d4" style="display: flex; gap: 28px; align-items: center; flex-wrap: wrap;">
+            <span class="pill">2023 — 대화가 이어지는 글</span>
+            <span style="font: 700 30px/1 var(--font-body); color: var(--blue);">→</span>
+            <span class="pill blue">2026 — 밖으로 퍼지는 글, 아는 사람끼리의 대화</span>
+            <span class="src">출처: the-algorithm-ml recap README 31–40 · x-algorithm param.rs 402–526</span>
+        </div>
+    </div>
+    <aside class="notes">두 시기의 가중치를 나란히 놓았습니다. 2023년은 작성자가 답해 주는 대화가 75로 최고였고, 2026년엔 그 항목이 없고 링크 복사가 20으로 최고입니다. 답글은 맞팔 관계일 때 크게 올려 줍니다. 좋은 글의 기준이 ‘대화’에서 ‘확산과 아는 사람끼리의 대화’로 옮겨 갔다고 읽을 수 있습니다.</aside>
+</section>
+
+<!-- =========================================================
+     17. WEIGHTS KEEP MOVING
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="가중치는 지금도 바뀐다">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2026 · X</span><span>숫자의 변경 이력</span></div>
+        <div class="head reveal d2">
+            <h2 class="title">가중치는 지금도 바뀐다</h2>
+        </div>
+        <div class="post reveal d3">
+            <div class="post-head"><span class="av x">X</span><div class="who"><b>home-mixer/params/param.rs</b><span>파일 첫 줄</span></div><span class="when">2026.11.03</span></div>
+            <div class="code">
+                <div class="l hl"><i>1</i><span><span class="c">// mirrored from config feature-switch defaults; last sync 2026-11-03T16:00:34Z</span></span></div>
+            </div>
+        </div>
+        <div class="chart-grid reveal d4">
+            <div class="chart">
+                <h3>좋아요 가중치</h3>
+                <svg viewBox="0 0 760 320" role="img" aria-label="좋아요 가중치: 8월 13일 0.5, 10월 13일 0.6, 10월 14일부터 0.66">
+                    <line class="ax" x1="40" y1="260" x2="700" y2="260"></line>
+                    <path class="ln" d="M40 186.7 H525.1 V113.3 H533 V69.3 H700"></path>
+                    <circle class="pt" cx="40" cy="186.7" r="8"></circle>
+                    <circle class="pt" cx="700" cy="69.3" r="9"></circle>
+                    <text class="v" x="56" y="170">0.5</text>
+                    <text class="v" x="700" y="48" text-anchor="end">0.66</text>
+                    <text x="40" y="298">8/13</text>
+                    <text x="529" y="298" text-anchor="middle">10/13·14</text>
+                    <text x="700" y="298" text-anchor="end">11/4</text>
+                </svg>
+            </div>
+            <div class="chart">
+                <h3>‘관심 없음’ 가중치 (선이 높을수록 더 크게 깎음)</h3>
+                <svg viewBox="0 0 760 320" role="img" aria-label="관심 없음 가중치: 8월 13일 −43.2, 9월 29일 −47.52, 10월 14일부터 −52.272">
+                    <line class="ax" x1="40" y1="260" x2="700" y2="260"></line>
+                    <path class="ln neg" d="M40 213.1 H413.7 V149.7 H533 V80 H700"></path>
+                    <circle class="pt neg" cx="40" cy="213.1" r="8"></circle>
+                    <circle class="pt neg" cx="700" cy="80" r="9"></circle>
+                    <text class="v" x="56" y="197">−43.2</text>
+                    <text class="v" x="700" y="58" text-anchor="end">−52.272</text>
+                    <text x="40" y="298">8/13</text>
+                    <text x="413.7" y="298" text-anchor="middle">9/29</text>
+                    <text x="533" y="298" text-anchor="middle">10/14</text>
+                    <text x="700" y="298" text-anchor="end">11/4</text>
+                </svg>
+            </div>
+        </div>
+        <p class="reply-text reveal d5" style="font-size: 26px; color: var(--sub);">X는 실제 운영 설정값을 코드에 자동으로 복사한다고 밝혔다. 그래서 숫자가 바뀔 때마다 변경 이력이 남는다. 2023년엔 코드 속 숫자가 1.0으로 비어 있었다.</p>
+    </div>
+    <aside class="notes">X 코드 첫 줄에는 ‘운영 설정에서 복사했고 마지막 동기화는 11월 3일’이라고 적혀 있습니다. 그래서 숫자가 바뀌는 게 기록으로 남습니다. 좋아요 가중치는 석 달 사이 0.5에서 0.66으로, 관심 없음은 −43.2에서 −52.272로 바뀌었습니다. 큐레이션 기준이 고정된 게 아니라 계속 조정된다는 증거입니다.</aside>
+</section>
+
+<!-- =========================================================
+     18. SAME NUMBERS — split era
+     ========================================================= -->
+<section class="slide duo" data-era="x" aria-label="그대로인 세 숫자">
+    <div class="half l era-tw" style="background: transparent;">
+        <div class="topbar reveal d1"><span class="era-tag">2023 · Scala</span><span></span></div>
+        <h2 class="title reveal d2">모델은 바뀌었다.</h2>
+        <div class="post reveal d3" style="margin-top: 150px;">
+            <div class="post-head"><span class="av tw">tw</span><div class="who"><b>twitter/the-algorithm</b><span>OONTweetScalingScorer · DiversityDiscountProvider</span></div></div>
+            <div class="code sm">
+                <div class="l hl"><i>25</i><span>  <span class="k">private val</span> ScaleFactor = <span class="n">0.75</span></span></div>
+                <div class="l gap"><i>⋮</i><span></span></div>
+                <div class="l hl"><i>21</i><span>  <span class="k">private val</span> Decay = <span class="n">0.5</span></span></div>
+                <div class="l hl"><i>22</i><span>  <span class="k">private val</span> Floor = <span class="n">0.25</span></span></div>
+                <div class="l"><i>29</i><span>    score * ((1 - Floor) * Math.pow(Decay, position) + Floor)</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="half r era-x" style="background: transparent;">
+        <div class="topbar reveal d1"><span class="era-tag">2026 · Rust</span><span></span></div>
+        <h2 class="title reveal d2">이 세 숫자는 그대로다.</h2>
+        <div class="post reveal d3" style="margin-top: 150px;">
+            <div class="post-head"><span class="av x">X</span><div class="who"><b>xai-org/x-algorithm</b><span>vm-ranker/params.rs · xai-value-model/scoring.rs</span></div></div>
+            <div class="code sm">
+                <div class="l"><i>218</i><span>    OonWeightFactor,</span></div>
+                <div class="l hl"><i>221</i><span>    <span class="n">0.75</span></span></div>
+                <div class="l"><i>182</i><span>    AuthorDiversityDecay,</span></div>
+                <div class="l hl"><i>185</i><span>    <span class="n">0.5</span></span></div>
+                <div class="l"><i>188</i><span>    AuthorDiversityFloor,</span></div>
+                <div class="l hl"><i>191</i><span>    <span class="n">0.25</span></span></div>
+                <div class="l"><i>262</i><span>    (1.0 - floor) * decay_factor.powf(exponent) + floor</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="seam-num reveal d4">0.75 · 0.5 · 0.25</div>
+    <aside class="notes">발표의 핵심 장면입니다. 왼쪽은 2023년 Scala 코드, 오른쪽은 2026년 Rust 코드입니다. 언어도 AI 모델도 완전히 바뀌었는데, 모르는 사람 글 0.75, 같은 작성자 감쇠 0.5, 하한 0.25는 똑같습니다. 계산식까지 같습니다. ‘사람이 만든 규칙을 없앴다’는 선언과 달리 사람이 정한 숫자가 3년을 살아남았습니다.</aside>
+</section>
+
+<!-- =========================================================
+     19. EXPERIMENT DECIDES — bidirectional boost
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="맞팔 답글 가산점">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2026 · X</span><span>사람의 개입 ① 실험</span></div>
+        <div class="head reveal d2"><h2 class="title">맞팔 가산점은 실험하고, 여론을 듣고 고쳤다</h2></div>
+        <div class="split">
+            <div class="stack">
+                <div class="tiles reveal d3" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="tile"><span class="tile-k">2026.07.10</span><span class="tile-t">A/B 테스트</span><span class="tile-d">일부 사용자에게 5 · 10 · 15 · 20을 나눠 적용</span></div>
+                    <div class="tile"><span class="tile-k">07.13</span><span class="tile-t">20으로 확대</span><span class="tile-d">초기 결과가 좋아 많은 사용자에게</span></div>
+                    <div class="tile" style="border-color: var(--blue);"><span class="tile-k" style="color: var(--blue);">07.24</span><span class="tile-t">15로 낮춤</span><span class="tile-d">“월드컵 이야기가 잘 안 보인다”는 피드백</span></div>
+                </div>
+                <div class="post reveal d4">
+                    <div class="post-head"><span class="av x">X</span><div class="who"><b>home-mixer/params/param.rs</b><span>404–409</span></div><span class="when">2026.11.03</span></div>
+                    <div class="code sm">
+                        <div class="l"><i>404</i><span><span class="k">param!</span>(</span></div>
+                        <div class="l"><i>405</i><span>    BidirectionalFollowReplyWeightBoost,</span></div>
+                        <div class="l"><i>406</i><span>    f64,</span></div>
+                        <div class="l"><i>407</i><span>    <span class="s">"rust_home_mixer_bidirectional_follow_reply_weight_boost"</span>,</span></div>
+                        <div class="l hl"><i>408</i><span>    <span class="n">15.0</span></span></div>
+                        <div class="l"><i>409</i><span>);</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면 <span>· docs/BIDIRECTIONAL_BOOST_CHANGE.md 5–11</span></span>
+                    <p class="reply-text">서로 팔로우하는 사람의 글에는 ‘답글 달 확률’ 가중치를 크게 올려 준다. 그 크기를 사람이 실험으로 고르고, 월드컵 기간 사용자 반응을 보고 <span class="em">20 → 15</span>로 낮췄다.</p></div>
+                </div>
+                <div class="reply reveal d5">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">의미</span>
+                    <p class="reply-text">X가 이 과정을 직접 문서로 공개했다. 알고리즘 숫자는 <b>편집회의 대신 실험과 여론으로</b> 정해진다.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">X가 직접 공개한 문서입니다. 맞팔 상대의 글에 주는 가산점을 실험으로 5, 10, 15, 20 중에서 골랐고, 20으로 늘렸다가 월드컵 기간에 “경기 이야기가 잘 안 보인다”는 피드백을 듣고 15로 낮췄습니다. 숫자 하나에 사람의 판단이 들어가는 과정이 그대로 보입니다.</aside>
+</section>
+
+<!-- =========================================================
+     20. LAW DECIDES — Brazil election filter
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="브라질 선거 필터">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2026 · X</span><span>사람의 개입 ② 법</span></div>
+        <div class="head reveal d2"><h2 class="title">법이 시킨 큐레이션, 브라질 선거 필터</h2></div>
+        <div class="split">
+            <div class="post reveal d3">
+                <div class="post-head"><span class="av x">X</span><div class="who"><b>brazil_2026_election_filter.rs</b><span>home-mixer/filters · 커밋 c65aa17</span></div><span class="when">2026.08.14</span></div>
+                <div class="code sm">
+                    <div class="l"><i>8</i><span><span class="c">// Brazil 2026 election filter</span></span></div>
+                    <div class="l hl"><i>10</i><span><span class="c">// Application providers that use a recommendation system for users must exclude from the</span></span></div>
+                    <div class="l hl"><i>11</i><span><span class="c">// results the channels and profiles reported to the Electoral Court under the terms of</span></span></div>
+                    <div class="l hl"><i>12</i><span><span class="c">// § 1º of this article and, except in cases of paid boosting, the content posted on them.</span></span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l"><i>1359</i><span>    <span class="k">fn</span> is_excluded_author(user_id: u64, followed_user_ids: &amp;FxHashSet&lt;u64&gt;) -&gt; bool {</span></div>
+                    <div class="l hl"><i>1360</i><span>        BRAZIL_2026_ELECTION_USER_IDS.contains(&amp;user_id) &amp;&amp; !followed_user_ids.contains(&amp;user_id)</span></div>
+                    <div class="l"><i>1361</i><span>    }</span></div>
+                </div>
+            </div>
+            <div class="stack">
+                <div class="bars reveal d4">
+                    <div class="bar-row"><span class="d">08.14</span><span class="b"><i style="width: 98px;"></i>665개 계정</span></div>
+                    <div class="bar-row"><span class="d">10.03</span><span class="b"><i style="width: 420px;"></i>2,839</span></div>
+                    <div class="bar-row"><span class="d">10.14</span><span class="b"><i style="width: 5px;"></i>25 (결선 후보)</span></div>
+                    <div class="bar-row"><span class="d">10.28</span><span class="b gone">선거 후 필터 삭제</span></div>
+                </div>
+                <div class="reply reveal d5">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면 <span>· 10–12, 1360번째 줄</span></span>
+                    <p class="reply-text">브라질 선거법에 따라, 선거법원에 신고된 후보 계정의 글을 <b>팔로우하지 않은 사람</b>의 추천 탭에서 뺐다. 계정 목록은 사람이 관리했고, “이 계정은 후보 본인 계정이 아니라고 판단해 제외했다”는 메모까지 남아 있다(커밋 b412112).</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">법이 큐레이션을 직접 바꾼 사례입니다. 브라질 선거법이 추천 시스템에서 후보 계정을 빼라고 요구했고, X는 법 조문을 코드 주석에 그대로 적었습니다. 목록은 665개에서 2,839개, 결선 후보 25개로 바뀌었다가 선거가 끝나자 삭제됐습니다. 팔로우한 사람에게는 보이고 추천으로만 안 뜨게 했다는 점도 눈여겨볼 만합니다.</aside>
+</section>
+
+<!-- =========================================================
+     21. FILTER — visibility verdicts
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="거르기">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2026 · X</span><span>3단계 거르기</span></div>
+        <div class="head reveal d2"><h2 class="title">보여 줄지 말지는 점수와 따로 정한다</h2></div>
+        <div class="verdicts reveal d3">
+            <div class="vd"><span class="tag">ALLOW</span><div class="mock"><i></i><i></i></div><span class="what">그대로 보여 준다</span></div>
+            <div class="vd"><span class="tag">NOTICE</span><div class="mock"><i></i><i></i><span class="note">안내문</span></div><span class="what">안내문을 붙여 보여 준다</span></div>
+            <div class="vd"><span class="tag">INTERSTITIAL</span><div class="mock blur"><i></i><i></i><span class="see">보기</span></div><span class="what">가림막 뒤에 숨긴다</span></div>
+            <div class="vd"><span class="tag">DROP</span><div class="mock none"></div><span class="what">아예 보여 주지 않는다</span></div>
+        </div>
+        <div class="split" style="grid-template-columns: 1.15fr 0.85fr;">
+            <div class="post reveal d4">
+                <div class="post-head"><span class="av x">X</span><div class="who"><b>visibility-filtering/rules/tweet_rules.rs</b><span>176–193</span></div><span class="when">2026.11.04</span></div>
+                <div class="code sm">
+                    <div class="l"><i>176</i><span><span class="k">pub</span>(super) <span class="k">const</span> FOSNR_ABUSE_INSULTS_NON_FOLLOWER_DROP_UNDESIRABLE: Rule = Rule {</span></div>
+                    <div class="l hl"><i>178</i><span>    audience: NonFollowers,</span></div>
+                    <div class="l hl"><i>183</i><span>    action: drop_post(DropAs::PossiblyUndesirable),</span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l"><i>186</i><span><span class="k">pub</span>(super) <span class="k">const</span> FOSNR_ABUSE_INSULTS_FOLLOWER_SOFT_INTERVENTION_ABUSE: Rule = Rule {</span></div>
+                    <div class="l hl"><i>191</i><span>        ViewerFollowsAuthor,</span></div>
+                    <div class="l hl"><i>194</i><span>    action: soft_intervention(</span></div>
+                </div>
+            </div>
+            <div class="reply reveal d5">
+                <span class="av us">해설</span>
+                <div class="reply-body"><span class="reply-name">쉽게 말하면</span>
+                <p class="reply-text">‘표현의 자유는 있지만 도달의 자유는 없다(FOSNR)’ 라벨이 붙은 모욕 글은, 팔로워가 아닌 사람에게는 <span class="red">숨기고</span>, 팔로워에게는 <span class="em">약한 경고</span>만 붙인다. 같은 글도 보는 사람과의 관계에 따라 다르게 거른다.</p></div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">점수와 별개로, 글마다 그대로 보여 줄지, 안내문을 붙일지, 가림막을 칠지, 아예 뺄지를 정합니다. X가 내세운 ‘표현의 자유, 도달의 자유는 아님’ 원칙이 실제 규칙으로 들어가 있습니다. 모욕 라벨이 붙은 글은 팔로워가 아니면 숨기고, 팔로워에게는 경고만 붙입니다. 2023년에도 같은 이름의 라벨 파일이 있었지만, 그때는 이 코드의 일부가 빠진 채 공개됐습니다.</aside>
+</section>
+
+<!-- =========================================================
+     22. INPUTS ABOUT ME
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="추천 모델이 받는 나의 정보">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2026 · X</span><span>모델이 보는 ‘나’</span></div>
+        <div class="head reveal d2"><h2 class="title">추천 모델에 들어가는 ‘나’의 정보</h2></div>
+        <div class="split">
+            <div class="post reveal d3">
+                <div class="post-head"><span class="av x">X</span><div class="who"><b>home-mixer/util/phoenix_request.rs</b><span>101–145</span></div><span class="when">2026.11.04</span></div>
+                <div class="code sm">
+                    <div class="l"><i>101</i><span><span class="k">pub fn</span> build_user_context(query: &amp;ScoredPostsQuery) -&gt; Option&lt;UserContext&gt; {</span></div>
+                    <div class="l hl"><i>103</i><span>        user_age_bracket: query</span></div>
+                    <div class="l hl"><i>108</i><span>        user_gender: query</span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l hl"><i>118</i><span>        user_age_in_years: query.user_age_in_years.unwrap_or(0),</span></div>
+                    <div class="l hl"><i>119</i><span>        user_inferred_gender: query.user_inferred_gender.map(|v| v <span class="k">as</span> i32).unwrap_or(0),</span></div>
+                    <div class="l"><i>120</i><span>        user_inferred_gender_score: query.user_inferred_gender_score.unwrap_or(0.0),</span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l hl"><i>129</i><span>        user_longitude: query</span></div>
+                    <div class="l hl"><i>134</i><span>        user_latitude: query</span></div>
+                    <div class="l"><i>139</i><span>        user_dma_code: zip_to_dma_code(</span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l hl"><i>145</i><span>        user_installed_apps: query.user_installed_apps.clone().unwrap_or_default(),</span></div>
+                </div>
+            </div>
+            <div class="thread">
+                <div class="reply reveal d4">
+                    <span class="av us">해설</span>
+                    <div class="reply-body"><span class="reply-name">쉽게 말하면</span>
+                    <p class="reply-text">추천 모델에 보내는 요청에 나이, 성별, <b>AI가 추정한 성별</b>, IP로 알아낸 위치(경도·위도·지역 코드), <b>휴대폰에 설치한 앱 목록</b>이 들어간다.</p></div>
+                </div>
+                <div class="reply warn reveal d5">
+                    <span class="av us">주의</span>
+                    <div class="reply-body"><span class="reply-name">미확인</span>
+                    <p class="reply-text">모델 설정에서 이 입력을 켜고 끌 수 있고, 설정마다 다르다. 실제 운영 모델이 이 값을 쓰는지는 코드만으로 확인할 수 없었다.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">큐레이션이 나를 얼마나 아는지도 볼 수 있습니다. 2026년 코드는 추천 모델에 나이, 성별, AI가 추정한 성별, 위치, 설치한 앱 목록까지 보냅니다. 다만 실제 운영 모델이 이 값을 쓰는지는 설정에 따라 달라서 확인하지 못했습니다. 미확인이라고 분명히 말해야 하는 부분입니다.</aside>
+</section>
+
+<!-- =========================================================
+     23. SAME MEASUREMENT, NEW NAME
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="특정 계정 노출 측정">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2023 ↔ 2026</span><span>사람의 개입 ③ 측정</span></div>
+        <div class="head reveal d2"><h2 class="title">특정 계정 노출 측정은 이름만 바뀌었다</h2></div>
+        <div class="split" style="grid-template-columns: 1fr 1fr;">
+            <div class="post era-tw reveal d3">
+                <div class="post-head"><span class="av tw">tw</span><div class="who"><b>2023 · 이름으로 박힌 목록</b><span>HomeTweetTypePredicates.scala · 공개 당일 삭제</span></div></div>
+                <div class="code">
+                    <div class="l del"><i>225</i><span>      <span class="s">"author_is_elon"</span>,</span></div>
+                    <div class="l del"><i>230</i><span>      <span class="s">"author_is_power_user"</span>,</span></div>
+                    <div class="l del"><i>236</i><span>      <span class="s">"author_is_democrat"</span>,</span></div>
+                    <div class="l del"><i>242</i><span>      <span class="s">"author_is_republican"</span>,</span></div>
+                </div>
+            </div>
+            <div class="post reveal d4">
+                <div class="post-head"><span class="av x">X</span><div class="who"><b>2026 · 비어 있는 목록</b><span>param.rs 1099–1104 · author_served_metrics_side_effect.rs 12–14</span></div></div>
+                <div class="code">
+                    <div class="l"><i>1100</i><span>    AuthorServedMetricsAuthorIds,</span></div>
+                    <div class="l"><i>1101</i><span>    Vec&lt;u64&gt;,</span></div>
+                    <div class="l hl"><i>1103</i><span>    vec![]</span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l"><i>12</i><span><span class="k">const</span> SERVED_METRIC: &amp;str = <span class="s">"AuthorServedMetrics.Served"</span>;</span></div>
+                    <div class="l"><i>14</i><span><span class="k">const</span> SERVED_TOP10_METRIC: &amp;str = <span class="s">"AuthorServedMetrics.ServedTop10"</span>;</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="reply reveal d5" style="max-width: 1560px;">
+            <span class="av us">해설</span>
+            <div class="reply-body"><span class="reply-name">쉽게 말하면</span>
+            <p class="reply-text">2023년엔 대상이 이름으로 코드에 박혀 있었다. 2026년엔 ‘지정한 작성자’의 글이 몇 번 노출됐는지, 상위 10개 안에 몇 번 들었는지 세는 장치가 있고, 공개본의 목록은 <span class="em">비어 있다</span>. 운영에서 누가 들어 있는지는 알 수 없다.</p></div>
+        </div>
+    </div>
+    <aside class="notes">2023년에 지워졌던 특정 계정 노출 측정이 2026년에도 있습니다. 차이는 대상이 코드에 이름으로 박혀 있지 않고, 설정 목록으로 빠져 있다는 점입니다. 공개본의 목록은 비어 있어서 실제로 누구를 재는지는 알 수 없습니다.</aside>
+</section>
+
+<!-- =========================================================
+     24. TRANSPARENCY 2026
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="2026 투명성">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2026 · X</span><span>공개의 범위</span></div>
+        <div class="head reveal d2"><h2 class="title">더 많이 열었지만, 내 피드를 재현할 수는 없다</h2></div>
+        <div class="split" style="grid-template-columns: 1fr 1fr 1.05fr; gap: 40px; flex: none;">
+            <div class="tile reveal d3">
+                <span class="tile-k" style="color: var(--repost);">공개된 것</span>
+                <span class="tile-d" style="color: var(--ink);">· 실제 운영 가중치와 변경 이력<br>· 거르기 규칙 대부분<br>· 계정에 라벨을 붙이는 규칙과 모델<br>· 트래픽 10% 이상 실험을 공개하겠다는 목표<br>· 내 계정·글에 붙은 노출 제한 라벨 확인 도구</span>
+            </div>
+            <div class="tile reveal d4">
+                <span class="tile-k" style="color: var(--alert);">빠진 것</span>
+                <span class="tile-d" style="color: var(--ink);">· 학습 데이터와 완성된 모델<br>· 일부 라벨 규칙(악용 방지 이유)<br>· AI 분류기에 주는 지시문(프롬프트)<br>· 인기 작성자를 정하는 방식<br>· 지정 계정 측정 목록</span>
+            </div>
+            <div class="post reveal d5">
+                <div class="post-head"><span class="av x">X</span><div class="who"><b>xai-org/x-algorithm</b><span>README.md · 444–447</span></div></div>
+                <div class="code sm">
+                    <div class="l"><i>444</i><span>… there are a limited set of files not currently published in the repository, e.g.:</span></div>
+                    <div class="l hl"><i>446</i><span>- Grox prompts. E.g. the j2 files with the specific LLM prompts used in Grox.</span></div>
+                    <div class="l hl"><i>447</i><span>- Some botmaker rules</span></div>
+                </div>
+            </div>
+        </div>
+        <p class="reply-text reveal d5" style="font-size: 27px; color: var(--sub);">개인용 확인 도구(Under the Hood)는 내 글에 붙은 라벨이 사람이 직접 붙인 것인지, 어느 나라 법 때문에 가려졌는지까지 보여 준다. 2023년엔 없던 방식이다.</p>
+    </div>
+    <aside class="notes">2026년 공개는 2023년보다 훨씬 넓습니다. 실제 가중치, 거르기 규칙, 개인이 자기 계정 라벨을 확인하는 도구까지 있습니다. 하지만 학습 데이터와 완성된 모델이 없어서 내 피드가 왜 이렇게 나오는지 똑같이 재현할 수는 없습니다. 일부 규칙과 AI 지시문은 악용을 막는다는 이유로 빠졌습니다.</aside>
+</section>
+
+<!-- =========================================================
+     25. PART 3 DIVIDER — split era
+     ========================================================= -->
+<section class="slide duo" data-era="x" aria-label="변하지 않은 것">
+    <div class="half l era-tw" style="background: transparent; justify-content: center;">
+        <div class="big reveal d1" style="font: 900 260px/0.9 var(--font-display); letter-spacing: -0.05em;">2023</div>
+    </div>
+    <div class="half r era-x" style="background: transparent; justify-content: center; align-items: flex-end;">
+        <div class="big reveal d1" style="font: 900 260px/0.9 var(--font-display); letter-spacing: -0.05em;">2026</div>
+    </div>
+    <div class="reveal d2" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; z-index: 3;">
+        <span style="width: 54px; height: 54px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 14px rgba(29, 155, 240, 0.2);"></span>
+        <span class="pill blue" style="font-size: 30px; padding: 14px 34px;">변하지 않은 것</span>
+    </div>
+    <aside class="notes">마지막 부분입니다. 3년 동안 트위터와 X가 공유한 기본 전제를 정리합니다.</aside>
+</section>
+
+<!-- =========================================================
+     26. SHARED PREMISES — split era rows
+     ========================================================= -->
+<section class="slide duo" data-era="x" aria-label="공유하는 기본 전제">
+    <div class="half l era-tw" style="background: transparent;">
+        <div class="topbar reveal d1"><span class="era-tag">2023에도</span><span></span></div>
+        <h2 class="title reveal d2" style="font-size: 50px;">두 시스템이 공유하는</h2>
+    </div>
+    <div class="half r era-x" style="background: transparent;">
+        <div class="topbar reveal d1"><span class="era-tag">2026에도</span><span></span></div>
+        <h2 class="title reveal d2" style="font-size: 50px;">다섯 가지 기본 전제</h2>
+    </div>
+    <div class="prem">
+        <div class="prem-row reveal d2"><span class="claim">① 큐레이션 = 예측 × 가치 판단</span><span class="ev2 l">score = sum_i { (weight) * (probability) } · recap README 45</span><span class="ev2 r">Final Score = Σ (weight_i × P(action_i)) · README 365</span></div>
+        <div class="prem-row reveal d3"><span class="claim">② 관계가 신뢰를 정한다</span><span class="ev2 l">모르는 사람 글 ScaleFactor = <b>0.75</b></span><span class="ev2 r">OonWeightFactor = <b>0.75</b> · 맞팔이면 답글 +15</span></div>
+        <div class="prem-row reveal d3"><span class="claim">③ 다양성은 규칙으로 지킨다</span><span class="ev2 l">Decay = <b>0.5</b> · Floor = <b>0.25</b></span><span class="ev2 r">AuthorDiversityDecay <b>0.5</b> · Floor <b>0.25</b></span></div>
+        <div class="prem-row reveal d4"><span class="claim">④ 순서와 노출 허용은 따로 정한다</span><span class="ev2 l">visibility-filters: hard-filtering, visible product treatments, downranking · README 48</span><span class="ev2 r">“Ranking and Visibility Are Separate” · README 492</span></div>
+        <div class="prem-row reveal d5"><span class="claim">⑤ 숫자는 플랫폼 목표에 맞춰 계속 고친다</span><span class="ev2 l">“periodically adjusted the weights to optimize for platform metrics” · recap README 50</span><span class="ev2 r">가중치 변경 이력 · A/B 실험 · 20 → 15</span></div>
+    </div>
+    <aside class="notes">다섯 가지입니다. 첫째, 큐레이션은 반응 예측에 회사의 가치 판단을 곱한 것입니다. 둘째, 관계가 신뢰를 정합니다. 모르는 사람 글은 똑같이 0.75배입니다. 셋째, 다양성은 AI가 아니라 규칙으로 지킵니다. 넷째, 순서를 정하는 일과 보여 줄지 정하는 일은 따로입니다. 다섯째, 이 숫자들은 플랫폼 목표에 맞춰 계속 조정됩니다. 2023년 설명서도 그렇게 인정했습니다.</aside>
+</section>
+
+<!-- =========================================================
+     27. WHAT CHANGED
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="3년 동안 바뀐 것">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">2023 → 2026</span><span>정리</span></div>
+        <div class="head reveal d2"><h2 class="title">3년 동안 바뀐 것</h2></div>
+        <table class="cmp reveal d3">
+            <thead><tr><th style="width: 22%;">무엇이</th><th style="width: 37%;">2023 트위터</th><th>2026 X</th></tr></thead>
+            <tbody>
+                <tr><td><b>좋은 글의 기준</b></td><td>대화 (작성자가 답한 답글 75)</td><td>확산 (링크 복사 20) · 맞팔 대화 (+15) · 머문 시간</td></tr>
+                <tr><td><b>점수를 매기는 AI</b></td><td>전용 신경망, 반응 10가지 예측</td><td>Grok 계열 트랜스포머, 20가지 넘게 예측</td></tr>
+                <tr><td><b>사람이 정한 규칙</b></td><td>코드 속에 조용히: 유료 인증 ×4, 경쟁사 계정·링크 거르기</td><td>근거를 밝히고 문서로: 실험(맞팔 가산점), 법(브라질 선거 필터)</td></tr>
+                <tr><td><b>공개 방식</b></td><td>한 번 공개, 진짜 숫자는 설명서에 따로</td><td>거의 매일 갱신, 운영 숫자를 코드에 자동 반영</td></tr>
+                <tr><td><b>이용자가 볼 수 있는 것</b></td><td>없음</td><td>내 계정·글에 붙은 노출 제한 라벨 확인 도구</td></tr>
+            </tbody>
+        </table>
+        <p class="src reveal d4">경쟁사 거르기: 2023 ScoredTweetsParam.scala 171–175, OutOfNetworkCompetitorFilter (목록은 비공개). 2026 공개 코드에서는 찾지 못했다.</p>
+    </div>
+    <aside class="notes">바뀐 것을 정리하면, 좋은 글의 기준이 대화에서 확산과 아는 사람 사이 대화로 옮겨 갔고, AI 모델이 바뀌었고, 사람이 정한 규칙은 코드 속 조용한 규칙에서 근거를 밝힌 규칙으로 바뀌었습니다. 공개도 한 번에서 매일로, 이용자가 자기 상태를 확인하는 도구까지 생겼습니다.</aside>
+</section>
+
+<!-- =========================================================
+     28. CAUTIONS
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="조심할 세 가지">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">해석할 때</span><span>한계</span></div>
+        <div class="head reveal d2"><h2 class="title">이 자료를 읽을 때 조심할 세 가지</h2></div>
+        <div class="split" style="grid-template-columns: 0.78fr 1.22fr; gap: 48px;">
+            <div class="thread">
+                <div class="reply warn reveal d3">
+                    <span class="av us">①</span>
+                    <div class="reply-body"><span class="reply-name">공개 코드 ≠ 운영 코드</span>
+                    <p class="reply-text">사용자마다 실험군이 달라 실제 값이 다를 수 있다. “X는 이렇게 한다”가 아니라 “X가 공개한 코드에는 이렇게 적혀 있다”.</p></div>
+                </div>
+                <div class="reply warn reveal d4">
+                    <span class="av us">②</span>
+                    <div class="reply-body"><span class="reply-name">머스크 코드는 ‘측정’이었다</span>
+                    <p class="reply-text">2023년 코드는 노출을 세는 장치였다. 띄워 주는 코드라는 증거는 공개 코드에 없다.</p></div>
+                </div>
+                <div class="reply warn reveal d5">
+                    <span class="av us">③</span>
+                    <div class="reply-body"><span class="reply-name">가중치 비율은 개수 환산이 아니다</span>
+                    <p class="reply-text">“신고 1건 = 좋아요 수백 개”는 틀린 계산이다. 가중치는 ‘내가 그 행동을 할 확률’에 곱한다.</p></div>
+                </div>
+            </div>
+            <div class="post reveal d4">
+                <div class="post-head"><span class="av x">X</span><div class="who"><b>home-mixer/params/param.rs</b><span>X가 직접 붙인 반박 주석 · 377–387</span></div></div>
+                <div class="code sm">
+                    <div class="l"><i>377</i><span><span class="c">// Each weight multiplies the *predicted* probability of that</span></span></div>
+                    <div class="l"><i>378</i><span><span class="c">// action (P(favorite), P(repost), …) or a continuous value e.g.</span></span></div>
+                    <div class="l"><i>379</i><span><span class="c">// watch time -- the weights do not multiply raw engagement counts.</span></span></div>
+                    <div class="l hl"><i>380</i><span><span class="c">// One common misinterpretation is that you can read these weight</span></span></div>
+                    <div class="l hl"><i>381</i><span><span class="c">// ratios as count equivalences, e.g. the incorrect statement that</span></span></div>
+                    <div class="l hl"><i>382</i><span><span class="c">// "one report cancels 468 likes" -- this is incorrect because the</span></span></div>
+                    <div class="l"><i>383</i><span><span class="c">// weights apply to the predicted probabilities rather than raw counts.</span></span></div>
+                    <div class="l gap"><i>⋮</i><span></span></div>
+                    <div class="l"><i>385</i><span><span class="c">// And the baseline probability of a Report is more than 1000x lower</span></span></div>
+                    <div class="l"><i>386</i><span><span class="c">// than a Like, so it’s weighted more to allow the prediction to affect</span></span></div>
+                    <div class="l"><i>387</i><span><span class="c">// the final ranking at all.</span></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes">발표하면서 과장하지 않도록 세 가지를 짚습니다. 공개 코드가 운영 코드와 같다는 보장은 없습니다. 머스크 관련 코드는 측정용이었습니다. 그리고 가중치 비율을 개수로 환산하면 안 됩니다. X도 이 오해를 반박하는 주석을 코드에 직접 달아 두었습니다.</aside>
+</section>
+
+<!-- =========================================================
+     29. CONCLUSION + DISCUSSION
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="결론">
+    <div class="pad" style="justify-content: center; gap: 56px;">
+        <div class="kicker reveal d1">결론</div>
+        <h2 class="reveal d2" style="font: 900 92px/1.15 var(--font-display); letter-spacing: -0.035em; color: var(--ink); text-wrap: balance; max-width: 1560px;">편집자는 사라지지 않았다.<br><span style="color: var(--blue);">숫자와 목록과 실험 속으로</span> 들어갔다.</h2>
+        <div class="tiles reveal d3" style="grid-template-columns: 1fr 1fr; max-width: 1600px;">
+            <div class="tile"><span class="tile-k">토론 질문 1</span><span class="tile-t">유료 인증 우대는 정말 사라졌을까, AI 모델 안으로 들어갔을까?</span></div>
+            <div class="tile"><span class="tile-k">토론 질문 2</span><span class="tile-t">학습 데이터 없이 코드만 공개하면, 큐레이션은 투명해진 걸까?</span></div>
+        </div>
+    </div>
+    <aside class="notes">결론입니다. 추천 알고리즘 시대에도 편집자는 사라지지 않았습니다. 가중치라는 숫자, 계정 목록, 그리고 실험 속으로 들어갔습니다. 마지막으로 두 가지 질문을 던지며 마칩니다.</aside>
+</section>
+
+<!-- =========================================================
+     30. SOURCES
+     ========================================================= -->
+<section class="slide era-x" data-era="x" aria-label="출처">
+    <div class="pad">
+        <div class="topbar reveal d1"><span class="era-tag">출처</span><span>모든 인용은 아래 시점의 원본</span></div>
+        <div class="head reveal d2"><h2 class="title">출처</h2></div>
+        <div class="tiles reveal d3" style="grid-template-columns: 1fr 1fr;">
+            <div class="tile">
+                <span class="tile-k">2023 트위터</span>
+                <span class="src" style="font-size: 22px; color: var(--ink);">github.com/twitter/the-algorithm<br>ef4c5eb (2023-03-31 첫 공개)<br>ec83d01 (2023-03-31 측정 코드 삭제)<br>72eda9a (2023-07-13) · c54bec0 (2025-09-03)<br><br>github.com/twitter/the-algorithm-ml<br>b852108 (2023-04-05 가중치 설명)</span>
+            </div>
+            <div class="tile">
+                <span class="tile-k">2026 X</span>
+                <span class="src" style="font-size: 22px; color: var(--ink);">github.com/xai-org/x-algorithm<br>aaa167b (2026-01-20 첫 공개)<br>47c1bcd (2026-08-13 대규모 공개)<br>c65aa17 · b412112 · 17c96bf · 5ed7963 (브라질 필터 이력)<br>b508926 (2026-11-04 분석 기준)<br>docs/BIDIRECTIONAL_BOOST_CHANGE.md</span>
+            </div>
+        </div>
+        <p class="src reveal d4">분석 노트: research/curation-x-algorithm/REPORT.md · 화살표 키로 넘기기, N 발표 메모, E 텍스트 수정, F 전체 화면</p>
+    </div>
+    <aside class="notes">출처는 모두 두 저장소의 특정 커밋입니다. 같은 커밋을 열면 오늘 보여 드린 코드를 그대로 확인할 수 있습니다.</aside>
+</section>
+
+</main>
+</div>
+
+<!-- ===========================================
+     PRESENTATION CHROME (outside the 1920×1080 stage)
+     =========================================== -->
+<div class="notes-panel" id="notesPanel" hidden><strong>발표 메모</strong><div id="notesText"></div></div>
+<nav class="chrome" aria-label="슬라이드 이동">
+    <button type="button" id="prevBtn" aria-label="이전 슬라이드">‹</button>
+    <span id="counter">1 / 30</span>
+    <button type="button" id="nextBtn" aria-label="다음 슬라이드">›</button>
+    <span class="yr">2023</span><span class="prog" aria-hidden="true"><b id="progBar" style="width: 0%;"></b></span><span class="yr">2026</span>
+    <button type="button" id="notesBtn" aria-pressed="false" title="발표 메모 (N)">메모</button>
+    <button type="button" id="editBtn" aria-pressed="false" title="텍스트 수정 (E)">수정</button>
+    <button type="button" id="resetEdits" hidden title="수정한 내용 지우기">원래대로</button>
+</nav>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   - fixed 1920×1080 stage scaled to the window
+   - keyboard / wheel / swipe / buttons, #s{n} deep links
+   - era sync: body[data-era] recolors letterbox + chrome
+   - N: speaker notes · E: inline text edit (saved in this browser) · F: fullscreen
+   =========================================== */
+(function () {
+    var stage = document.getElementById('deckStage');
+    var slides = Array.prototype.slice.call(stage.querySelectorAll('.slide'));
+    var counter = document.getElementById('counter');
+    var bar = document.getElementById('progBar');
+    var notesPanel = document.getElementById('notesPanel');
+    var notesText = document.getElementById('notesText');
+    var notesBtn = document.getElementById('notesBtn');
+    var editBtn = document.getElementById('editBtn');
+    var resetBtn = document.getElementById('resetEdits');
+    var EDIT_KEY = 'curation-deck-edits-v1';
+    var EDIT_SEL = 'h1, h2, h3, p, td, .reply-text, .reply-name, .tile-t, .tile-d, .tile-k, .cap, .lead, .pill, .claim, .ev .t, .what';
+    var cur = 0, morphTimer = null, wheelLock = false, editing = false;
+
+    /* --- stage scaling --- */
+    function scale() {
+        var f = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+        var x = (window.innerWidth - 1920 * f) / 2;
+        var y = (window.innerHeight - 1080 * f) / 2;
+        stage.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + f + ')';
+    }
+
+    /* --- restore edits saved in this browser (optional, may be unavailable) --- */
+    function readEdits() {
+        try { return JSON.parse(localStorage.getItem(EDIT_KEY) || '{}') || {}; } catch (e) { return {}; }
+    }
+    function restoreEdits() {
+        var saved = readEdits();
+        Object.keys(saved).forEach(function (k) {
+            var s = slides[+k];
+            if (s && typeof saved[k] === 'string') s.innerHTML = saved[k];
+        });
+        resetBtn.hidden = Object.keys(saved).length === 0 && !editing;
+    }
+    function saveEdit() {
+        try {
+            var saved = readEdits();
+            var clone = slides[cur].cloneNode(true);
+            clone.querySelectorAll('[contenteditable]').forEach(function (el) { el.removeAttribute('contenteditable'); });
+            saved[cur] = clone.innerHTML;
+            localStorage.setItem(EDIT_KEY, JSON.stringify(saved));
+        } catch (e) { /* storage unavailable: edits live only until reload */ }
+    }
+
+    /* --- show a slide --- */
+    function eraOf(s) {
+        var e = s.getAttribute('data-era');
+        return e === 'morph' ? 'tw' : e;
+    }
+    function show(i) {
+        i = Math.max(0, Math.min(slides.length - 1, i));
+        cur = i;
+        slides.forEach(function (s, k) {
+            var on = k === i;
+            s.classList.toggle('active', on);
+            s.classList.toggle('visible', on);
+            s.setAttribute('aria-hidden', on ? 'false' : 'true');
+        });
+        var s = slides[i];
+        document.body.setAttribute('data-era', eraOf(s));
+        clearTimeout(morphTimer);
+        if (s.getAttribute('data-era') === 'morph') {
+            morphTimer = setTimeout(function () { if (cur === i) document.body.setAttribute('data-era', 'x'); }, 1500);
+        }
+        counter.textContent = (i + 1) + ' / ' + slides.length;
+        bar.style.width = (slides.length > 1 ? (i / (slides.length - 1)) * 100 : 100) + '%';
+        var n = s.querySelector('.notes');
+        notesText.textContent = n ? n.textContent.trim() : '';
+        if (editing) setEditable(true);
+        try { history.replaceState(null, '', '#s' + (i + 1)); } catch (e) { /* ignore */ }
+    }
+    function next() { show(cur + 1); }
+    function prev() { show(cur - 1); }
+
+    /* --- inline editing --- */
+    function setEditable(on) {
+        slides.forEach(function (s, k) {
+            s.querySelectorAll(EDIT_SEL).forEach(function (el) {
+                if (on && k === cur) el.setAttribute('contenteditable', 'true');
+                else el.removeAttribute('contenteditable');
+            });
+        });
+    }
+    function toggleEdit() {
+        editing = !editing;
+        document.body.classList.toggle('editing', editing);
+        editBtn.setAttribute('aria-pressed', editing ? 'true' : 'false');
+        resetBtn.hidden = !editing && Object.keys(readEdits()).length === 0;
+        setEditable(editing);
+    }
+    stage.addEventListener('input', function () { if (editing) saveEdit(); });
+    resetBtn.addEventListener('click', function () {
+        try { localStorage.removeItem(EDIT_KEY); } catch (e) { /* ignore */ }
+        location.reload();
+    });
+
+    /* --- notes --- */
+    function toggleNotes() {
+        notesPanel.hidden = !notesPanel.hidden;
+        notesBtn.setAttribute('aria-pressed', notesPanel.hidden ? 'false' : 'true');
+        document.body.classList.toggle('show-chrome', !notesPanel.hidden);
+    }
+
+    /* --- fullscreen (optional; some viewers refuse it) --- */
+    function toggleFull() {
+        try {
+            if (document.fullscreenElement) document.exitFullscreen();
+            else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {});
+        } catch (e) { /* ignore */ }
+    }
+
+    /* --- save a copy (works when the file is opened locally) --- */
+    function saveCopy() {
+        try {
+            setEditable(false);
+            var html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+            if (editing) setEditable(true);
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+            a.download = 'curation-deck-edited.html';
+            a.click();
+        } catch (e) { /* ignore */ }
+    }
+
+    /* --- input --- */
+    document.addEventListener('keydown', function (e) {
+        var inText = e.target && e.target.isContentEditable;
+        if (location.protocol === 'file:' && (e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); saveCopy(); return; }
+        if (inText) { if (e.key === 'Escape') { e.target.blur(); } return; }
+        switch (e.key) {
+            case 'ArrowRight': case 'ArrowDown': case 'PageDown': case ' ': e.preventDefault(); next(); break;
+            case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); prev(); break;
+            case 'Home': show(0); break;
+            case 'End': show(slides.length - 1); break;
+            case 'n': case 'N': toggleNotes(); break;
+            case 'e': case 'E': toggleEdit(); break;
+            case 'f': case 'F': toggleFull(); break;
+        }
+    });
+    window.addEventListener('wheel', function (e) {
+        if (editing || wheelLock || Math.abs(e.deltaY) < 30) return;
+        wheelLock = true;
+        if (e.deltaY > 0) next(); else prev();
+        setTimeout(function () { wheelLock = false; }, 750);
+    }, { passive: true });
+    var tx = null, ty = null;
+    window.addEventListener('touchstart', function (e) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+    window.addEventListener('touchend', function (e) {
+        if (tx === null || editing) return;
+        var dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { if (dx < 0) next(); else prev(); }
+        tx = ty = null;
+    }, { passive: true });
+    document.getElementById('nextBtn').addEventListener('click', next);
+    document.getElementById('prevBtn').addEventListener('click', prev);
+    notesBtn.addEventListener('click', toggleNotes);
+    editBtn.addEventListener('click', toggleEdit);
+    window.addEventListener('resize', scale);
+    window.addEventListener('hashchange', function () {
+        var m = /^#s(\d+)$/.exec(location.hash);
+        if (m && +m[1] - 1 !== cur) show(+m[1] - 1);
+    });
+
+    /* --- boot --- */
+    restoreEdits();
+    slides = Array.prototype.slice.call(stage.querySelectorAll('.slide'));
+    scale();
+    var m0 = /^#s(\d+)$/.exec(location.hash);
+    show(m0 ? +m0[1] - 1 : 0);
+})();
+</script>
+
+</html>
