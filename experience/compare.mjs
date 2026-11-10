@@ -13,8 +13,8 @@ function show(){const a=states['2023'],b=states['2026'];if(!a||!b)return;
 }
 window.addEventListener('message',event=>{
  const era=Object.keys(frames).find(year=>frames[year].contentWindow===event.source);if(!era)return;
- if(event.data?.type==='lab-snapshot'&&event.data.year===era){states[era]=event.data;show();if(era==='2023')frames['2026'].contentWindow.postMessage({type:'lab-command',action:'clear-rank-hop'},'*');}
- if(event.data?.type==='lab-selected'){selected=event.data.id;document.getElementById('selected-text').textContent=event.data.text;show();if(era==='2023'&&event.data.navigate&&states['2023']?.ranks[selected]){window.dispatchEvent(new Event('rank-hop-focus'));frames['2026'].contentWindow.postMessage({type:'lab-command',action:'rank-hop',id:selected,sourceRank:states['2023'].ranks[selected]},'*');}}
+ if(event.data?.type==='lab-snapshot'&&event.data.year===era){states[era]=event.data;show();frames[era==='2023'?'2026':'2023'].contentWindow.postMessage({type:'lab-command',action:'clear-rank-hop'},'*');}
+ if(event.data?.type==='lab-selected'){selected=event.data.id;document.getElementById('selected-text').textContent=event.data.text;show();if(event.data.navigate&&states[era]?.ranks[selected]){const targetEra=era==='2023'?'2026':'2023';window.dispatchEvent(new CustomEvent('rank-hop-focus',{detail:{targetEra}}));frames[targetEra].contentWindow.postMessage({type:'lab-command',action:'rank-hop',id:selected,sourceRank:states[era].ranks[selected]},'*');}}
  if(event.data?.type==='lab-search-request'){document.getElementById('shared-query').scrollIntoView({block:'center'});document.getElementById('shared-query').focus();}
 });
 document.getElementById('shared-persona').onchange=sync;

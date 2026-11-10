@@ -15,7 +15,7 @@ document.querySelectorAll('[data-focus-era]').forEach(b=>b.onclick=()=>{
  focusEra=b.dataset.focusEra;section.classList.toggle('focus-2026',focusEra==='2026');
  document.querySelectorAll('[data-focus-era]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));api?.focus();
 });
-window.addEventListener('rank-hop-focus',()=>{api?.front();if(stage.clientWidth<=760)document.querySelector('[data-focus-era="2026"]').click();stage.scrollIntoView({block:'center',behavior:'instant'});});
+window.addEventListener('rank-hop-focus',event=>{const targetEra=event.detail?.targetEra;if(!['2023','2026'].includes(targetEra))return;api?.front();if(stage.clientWidth<=760)document.querySelector(`[data-focus-era="${targetEra}"]`).click();stage.scrollIntoView({block:'center',behavior:'instant'});});
 // Each child can reload when its CSS3D surface first enters the scene.
 window.addEventListener('message',e=>{if(e.data?.type==='lab-ready'){const year=['2023','2026'].find(y=>document.getElementById('frame-'+y).contentWindow===e.source);if(year)command(year,'rank-labels',{enabled:document.getElementById('show-rank-labels').checked});}});
 function fallback(message){stage.dataset.phase='fallback';status.textContent=message;document.getElementById('skip-stage').hidden=true;document.getElementById('turn-phones').hidden=true;document.getElementById('replay-stage').disabled=true;window.phoneStageSnapshot={mode:'fallback',phase:'ready',reason:message};}
