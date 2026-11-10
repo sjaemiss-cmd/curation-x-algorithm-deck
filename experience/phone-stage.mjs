@@ -57,7 +57,7 @@ function start(){
  if(new URLSearchParams(location.search).has('no3d')){fallback('입체 효과 없이도 두 피드를 그대로 체험할 수 있습니다.');return;}
  let renderer;
  try{renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});}catch{fallback('이 기기에서는 입체 효과 대신 일반 목업으로 보여드립니다.');return;}
- renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.35;renderer.domElement.className='webgl-stage';renderer.domElement.setAttribute('aria-hidden','true');stage.append(renderer.domElement);
+ renderer.setPixelRatio(Math.min(devicePixelRatio,1.25));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.35;renderer.domElement.className='webgl-stage';renderer.domElement.setAttribute('aria-hidden','true');stage.append(renderer.domElement);
  const scene=new THREE.Scene(),cssScene=new THREE.Scene();const camera=new THREE.OrthographicCamera(-6,6,3.8,-3.8,.1,100);camera.position.set(0,0,20);
  const cssRenderer=new CSS3DRenderer();cssRenderer.domElement.className='css-stage';stage.append(cssRenderer.domElement);
  const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;room.dispose();pmrem.dispose();

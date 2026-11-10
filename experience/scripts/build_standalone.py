@@ -1,9 +1,9 @@
 from pathlib import Path
-import re,json,html as html_lib
+import re,json,hashlib,html as html_lib
 root=Path(__file__).resolve().parents[1]
 read=lambda name:(root/name).read_text(encoding='utf8')
 def version_assets(document):
- return re.sub(r'((?:src|href)="[^"?#]+\.(?:css|mjs|js|html))(\?[^"#]*)?"',lambda m:m[1]+(m[2]+'&amp;' if m[2] else '?')+'v=stage1"',document)
+ return re.sub(r'((?:src|href)="[^"?#]+\.(?:css|mjs|js|html))(\?[^"#]*)?"',lambda m:m[1]+(m[2]+'&amp;' if m[2] else '?')+'v=cache1"',document)
 template=read('single-template.html')
 (root/'single.html').write_text(version_assets(template),encoding='utf8')
 data={f'data/{n}':json.loads(read('data/'+n)) for n in ['posts.json','posts.ko.json','source-defaults.json','twitter-2023-defaults.json','provenance.json']}
@@ -28,8 +28,14 @@ for year,child in children.items():compare=compare.replace(f'src="single.html?ye
 (root/'비교앱.html').write_text(compare,encoding='utf8')
 stage=read('stage-template.html');(root/'index.html').write_text(version_assets(stage),encoding='utf8')
 stage=stage.replace('<link rel="stylesheet" href="stage.css">','<style>'+read('stage.css')+'</style>').replace('<script src="compare.mjs" type="module"></script>','<script type="module">'+read('compare.mjs')+'</script>').replace('<script src="phone-stage.bundle.js"></script>','<script>'+read('phone-stage.bundle.js').replace('</script','<\\/script')+'</script>')
+stage=stage.replace('<script src="presentation-cache.js"></script>','<script>'+read('presentation-cache.js')+'</script>')
 for year,child in children.items():
  child=child.replace('const embeddedData=','window.__PHONE_SKIN__=true;const embeddedData=')
  stage=stage.replace(f'src="single.html?year={year}&amp;device=1"','srcdoc="'+html_lib.escape(child,quote=True)+'"')
 (root/'체험앱.html').write_text(stage,encoding='utf8')
 print('3D standalone built:',len(stage.encode('utf8')),'bytes; classic:',len(compare.encode('utf8')))
+
+files=['index.html','single.html','classic.html','stage.css','style.css','device-ui.css','compare.css','compare.mjs','app.mjs','active-engine.mjs','engine.mjs','twitter-engine.mjs','translations.mjs','phone-stage.bundle.js','presentation-cache.js','data/posts.json','data/posts.ko.json','data/source-defaults.json','data/twitter-2023-defaults.json','data/provenance.json']
+revision=hashlib.sha256(b''.join((root/f).read_bytes() for f in files)).hexdigest()[:16]
+(root/'sw.js').write_text(read('sw-template.js').replace('__REVISION__',revision).replace('__FILES__',json.dumps(files)),encoding='utf8')
+print('Presentation cache:',revision,len(files),'files')

@@ -91,7 +91,8 @@ $('reset').onclick=()=>{reset();toast('모든 실험 설정과 표시를 처음 
 document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{weights={...defaults};if(b.dataset.preset==='likes')weights.favorite=10;if(b.dataset.preset==='share'){weights.retweet=15;if(ERA==='2026'){weights.share=30;weights.share_via_copy_link=50;}}if(b.dataset.preset==='time'){if(ERA==='2023'){weights.good_click_v2=40;}else{weights.dwell_time=1;weights.click_dwell_time=2;}}buildControls();syncCode();document.querySelectorAll('[data-preset]').forEach(x=>x.classList.toggle('active',x===b));schedule();});
 try{
  const load=async url=>{const r=await fetch(url);if(!r.ok)throw Error(`${url} (${r.status})`);return r.json();};
- [raw,defaults,dataMeta]=await Promise.all([load('data/posts.json'),load(DEFAULTS_PATH),load('data/provenance.json')]);validateWeights(defaults);raw=joinTranslations(raw,await load('data/posts.ko.json'));
+ let translations;
+ [raw,defaults,dataMeta,translations]=await Promise.all([load('data/posts.json'),load(DEFAULTS_PATH),load('data/provenance.json'),load('data/posts.ko.json')]);validateWeights(defaults);raw=joinTranslations(raw,translations);
  if(raw.length!==10000||new Set(raw.map(p=>p.text)).size!==10000)throw Error('실제 원문 1만 개의 무결성 검사 실패');
  if(ERA==='2023')setupTwitterUI();$('provenance').innerHTML=`<p>원 자료 ${dataMeta.sourceRows.toLocaleString()}행에서 중복을 제거하고, 고정 seed ${dataMeta.seed}로 10,000개를 선택했습니다.</p><p>데이터 버전 <code>${esc(dataMeta.commit)}</code><br>다운로드 파일 SHA-256 <code>${esc(dataMeta.sourceSha256)}</code></p>`;
  reset();
