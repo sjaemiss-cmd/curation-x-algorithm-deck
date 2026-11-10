@@ -15,6 +15,7 @@ window.addEventListener('message',event=>{
  const era=Object.keys(frames).find(year=>frames[year].contentWindow===event.source);if(!era)return;
  if(event.data?.type==='lab-snapshot'&&event.data.year===era){states[era]=event.data;show();}
  if(event.data?.type==='lab-selected'){selected=event.data.id;document.getElementById('selected-text').textContent=event.data.text;show();}
+ if(event.data?.type==='lab-search-request'){document.getElementById('shared-query').scrollIntoView({block:'center'});document.getElementById('shared-query').focus();}
 });
 document.getElementById('shared-persona').onchange=sync;
 document.getElementById('shared-following').onchange=sync;

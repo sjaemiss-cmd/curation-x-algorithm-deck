@@ -117,5 +117,23 @@ if(window.parent!==window){
   const d=event.data;
   if(d.action==='shared'){persona=d.persona||'balanced';query=d.query||'';following=!!d.following;savedMode=false;seen.clear();options.excludeSeen=false;$('excludeSeen').checked=false;$('persona').value=persona;$('search').value=query;candidates=raw.map(p=>simulate(p,persona));visible=20;baselineDirty=true;recompute();}
   if(d.action==='reset')reset();
+  if(d.action==='controls')openControls();
+  if(d.action==='inspect')openInspector();
+  if(d.action==='rank-labels')document.body.classList.toggle('show-ranks',!!d.enabled);
  });
+}
+
+if(new URLSearchParams(location.search).has('device')||window.__PHONE_SKIN__){
+ document.body.classList.add('device-ui');
+ const status=document.createElement('div');status.className='system-status';status.setAttribute('aria-hidden','true');
+ status.innerHTML='<span>9:41</span><span class="system-island"></span><span class="system-icons"><svg viewBox="0 0 18 12"><path d="M0 9h3v3H0zm5-3h3v6H5zm5-3h3v9h-3zm5-3h3v12h-3z"/></svg><svg viewBox="0 0 18 12"><path d="M0 3Q9-3 18 3l-2 2Q9 0 2 5zm4 4q5-4 10 0l-2 2q-3-2-6 0zm3 3q2-2 4 0l-2 2z"/></svg><span class="battery"></span></span>';
+ document.querySelector('.phone').prepend(status);
+ const nav=document.querySelector('.phone-nav');
+ const routes=ERA==='2026'?[['Grok','<path d="M4 4h16L4 20h16M4 4l16 16"/>'],['알림','<path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4"/>'],['쪽지','<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/>']]:[['알림','<path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4"/>'],['쪽지','<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/>']];
+ for(const [label,path]of routes){const b=document.createElement('button');b.setAttribute('aria-label',label);b.innerHTML='<svg viewBox="0 0 24 24">'+path+'</svg>';b.onclick=()=>toast(label+'는 이 읽기·추천 체험에서 제공하지 않아요.');nav.append(b);}
+ const compose=document.createElement('button');compose.className='compose-fab';compose.setAttribute('aria-label',ERA==='2023'?'트윗 작성 안내':'게시물 작성 안내');compose.textContent='+';compose.onclick=()=>toast('실제 게시 없이 추천 순서를 살펴보는 체험입니다.');document.querySelector('.phone').append(compose);
+ $('nav-search').onclick=()=>{window.parent.postMessage({type:'lab-search-request'},'*');};
+ $('feed').addEventListener('scroll',()=>{const f=$('feed');if(f.scrollHeight-f.scrollTop-f.clientHeight<180&&visible<rows.length){visible+=20;renderFeed();}},{passive:true});
+ // Keep the frame controls reachable without inventing real account activity.
+ window.parent.postMessage({type:'lab-ready',year:ERA},'*');
 }

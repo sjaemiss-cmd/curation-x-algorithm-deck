@@ -1,1 +1,14 @@
-{"name":"x-curation-lab","private":true,"type":"module","scripts":{"start":"node server.mjs","test":"node --test tests/*.test.mjs","data":"python scripts/prepare_data.py"}}
+{
+  "name": "x-curation-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "data": "python scripts/prepare_data.py",
+    "build": "esbuild phone-stage.mjs --bundle --format=iife --minify --legal-comments=inline --outfile=phone-stage.bundle.js && python scripts/build_standalone.py"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.11"
+  }
+}
