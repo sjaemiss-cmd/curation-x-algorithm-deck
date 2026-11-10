@@ -1,0 +1,25 @@
+{
+  "dataset": "TweetEval / sentiment / train",
+  "commit": "4fbd22cd78421f05b1ecdb4fc5725bc7a7bd8f66",
+  "url": "https://raw.githubusercontent.com/cardiffnlp/tweeteval/4fbd22cd78421f05b1ecdb4fc5725bc7a7bd8f66/datasets/sentiment/train_text.txt",
+  "sourceUrl": "https://github.com/cardiffnlp/tweeteval/blob/4fbd22cd78421f05b1ecdb4fc5725bc7a7bd8f66/datasets/sentiment/train_text.txt",
+  "sourceSha256": "368f01052ea6fd8ffc408a2a2e6ac9669e31542581a0396ef16591ea26eb98a6",
+  "sourceRows": 45615,
+  "uniqueSourceRows": 45587,
+  "selected": 10000,
+  "seed": 411,
+  "selection": "random.sample over first occurrence of each unique exact text",
+  "content": "Historical actual tweet texts, dataset preprocessing retained",
+  "unavailable": [
+    "original author identity",
+    "original timestamp",
+    "post ID and live URL",
+    "photos and videos",
+    "engagement counts",
+    "Phoenix predictions"
+  ],
+  "reference": "https://github.com/cardiffnlp/tweeteval",
+  "paper": "https://aclanthology.org/2020.findings-emnlp.148/",
+  "originalDatasetPaper": "https://aclanthology.org/S17-2088/",
+  "licenseNote": "TweetEval refers users to original task licenses and Twitter regulations. Local educational prototype; no public redistribution performed."
+}
