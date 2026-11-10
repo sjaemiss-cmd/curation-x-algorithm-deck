@@ -7,6 +7,7 @@ const postText=c=>c.text_ko||displayText(c.text);
 const common=['favorite','reply','retweet','share','share_via_copy_link','dwell_time','report','reply_engaged_by_author','good_click_v2','negative_feedback_v2'];
 const ranges={favorite:[0,10,.01],reply:[0,30,.1],retweet:[0,20,.1],share:[0,30,.1],share_via_copy_link:[0,50,.1],dwell_time:[0,1,.001],report:[-500,0,1]};
 const svg={reply:'<path d="M20 11.5a8 8 0 0 1-8 8H5l-3 2v-10a9 9 0 1 1 18 0Z"/>',retweet:'<path d="m4 8 3-3 3 3M7 5v11h7m6 0-3 3-3-3m3 3V8h-7"/>',like:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',save:'<path d="M6 3h12v18l-6-4-6 4Z"/>',read:'<path d="m4 12 5 5L20 6"/>'};
+let feedStart=0,hopFrame=0,hopAnimating=false;
 let raw=[],candidates=[],defaults,weights,options={...DEFAULT_OPTIONS},baselineWeights,baselineOptions,baselineMap=new Map(),baselineTop=[],rows=[],visible=20,selected=null,following=false,savedMode=false,persona='balanced',query='',seen=new Set(),saved=new Set(),liked=new Set(),reposted=new Set(),dataMeta,frame=0,baselineDirty=true;
 function toast(message){$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').classList.remove('show'),2600);}
 function openGuide(){$('guide').showModal();}
@@ -30,6 +31,7 @@ function weightChanged(){document.querySelectorAll('[data-preset]').forEach(b=>b
 function schedule(){cancelAnimationFrame(frame);frame=requestAnimationFrame(recompute);}
 function pool(){return savedMode?candidates.filter(c=>saved.has(c.id)):candidates;}
 function recompute(){
+ clearRankHop();if(feedStart){feedStart=0;visible=20;}
  const start=performance.now();const filters={following,query,seen};const source=pool();
  if(baselineDirty){const b=rank(source,baselineWeights,baselineOptions,filters);baselineMap=new Map(b.rows.map(r=>[r.id,r.rank]));baselineTop=b.rows.slice(0,20).map(r=>r.id);baselineDirty=false;}
  const result=rank(source,weights,options,filters);rows=result.rows;const duration=performance.now()-start;
@@ -48,9 +50,10 @@ function recompute(){
 function movement(r){const before=baselineMap.get(r.id);if(!before)return '<span class="rank-up">새 진입</span>';const d=before-r.rank;return `<span class="${d>0?'rank-up':d<0?'rank-down':'rank-same'}">${d>0?'↑ '+d:d<0?'↓ '+(-d):'변동 없음'}</span>`;}
 function sourceUrl(c){return dataMeta.sourceUrl+'#L'+c.sourceLine;}
 function renderFeed(){
- $('feed').innerHTML=rows.length?rows.slice(0,visible).map(r=>{
-  const c=r.c;return `<article class="post ${selected===r.id?'selected':''}" data-id="${esc(r.id)}"><div class="avatar" aria-label="실험용 작성자 그룹">${c.authorGroup}</div><div class="post-content"><div class="rank-strip"><b>${r.rank}위</b>${movement(r)}<span class="post-handle">${c.inNetwork?'팔로우':'팔로우 밖'}</span></div><div class="post-header"><strong>익명 게시글</strong><span class="post-handle">그룹 ${c.authorGroup} · 실험</span></div><p class="post-text" lang="ko">${esc(postText(c))}</p><details class="original-text"><summary>영어 원문 보기 · AI 번역</summary><p lang="en">${esc(displayText(c.text))}</p></details><div class="post-actions"><button data-action="reply" data-id="${r.id}" aria-label="답글 예상값 보기"><svg viewBox="0 0 24 24">${svg.reply}</svg><span>예상</span></button><button data-action="retweet" data-id="${r.id}" class="${reposted.has(r.id)?'on':''}" aria-pressed="${reposted.has(r.id)}" aria-label="재게시 표시"><svg viewBox="0 0 24 24">${svg.retweet}</svg></button><button data-action="like" data-id="${r.id}" class="${liked.has(r.id)?'on':''}" aria-pressed="${liked.has(r.id)}" aria-label="좋아요 표시"><svg viewBox="0 0 24 24">${svg.like}</svg></button><button data-action="save" data-id="${r.id}" class="${saved.has(r.id)?'on':''}" aria-pressed="${saved.has(r.id)}" aria-label="글 저장"><svg viewBox="0 0 24 24">${svg.save}</svg></button><button data-action="read" data-id="${r.id}" class="${seen.has(r.id)?'on':''}" aria-pressed="${seen.has(r.id)}" aria-label="읽음 표시"><svg viewBox="0 0 24 24">${svg.read}</svg><span>읽음</span></button></div><button class="explain" data-detail="${r.id}">왜 이 순위일까? · ${fmt(r.score)}</button><a class="source-mini" href="${sourceUrl(c)}" target="_blank" rel="noopener" aria-label="연구 데이터 원문 ${c.sourceLine}행">원문 ↗</a></div></article>`;
+ $('feed').innerHTML=rows.length?rows.slice(feedStart,visible).map(r=>{
+  const c=r.c;return `<article class="post ${selected===r.id?'selected':''}" data-id="${esc(r.id)}"><div class="avatar" aria-label="실험용 작성자 그룹">${c.authorGroup}</div><div class="post-content"><div class="rank-strip"><b>${r.rank}위</b>${movement(r)}<span class="post-handle">${c.inNetwork?'팔로우':'팔로우 밖'}</span></div><div class="post-header"><strong>익명 게시글</strong><span class="post-handle">그룹 ${c.authorGroup} · 실험</span></div><p class="post-text" lang="ko" ${ERA==='2023'?'tabindex="0" role="button" aria-label="이 글의 X 순위로 이동"':''}>${esc(postText(c))}</p><details class="original-text"><summary>영어 원문 보기 · AI 번역</summary><p lang="en">${esc(displayText(c.text))}</p></details><div class="post-actions"><button data-action="reply" data-id="${r.id}" aria-label="답글 예상값 보기"><svg viewBox="0 0 24 24">${svg.reply}</svg><span>예상</span></button><button data-action="retweet" data-id="${r.id}" class="${reposted.has(r.id)?'on':''}" aria-pressed="${reposted.has(r.id)}" aria-label="재게시 표시"><svg viewBox="0 0 24 24">${svg.retweet}</svg></button><button data-action="like" data-id="${r.id}" class="${liked.has(r.id)?'on':''}" aria-pressed="${liked.has(r.id)}" aria-label="좋아요 표시"><svg viewBox="0 0 24 24">${svg.like}</svg></button><button data-action="save" data-id="${r.id}" class="${saved.has(r.id)?'on':''}" aria-pressed="${saved.has(r.id)}" aria-label="글 저장"><svg viewBox="0 0 24 24">${svg.save}</svg></button><button data-action="read" data-id="${r.id}" class="${seen.has(r.id)?'on':''}" aria-pressed="${seen.has(r.id)}" aria-label="읽음 표시"><svg viewBox="0 0 24 24">${svg.read}</svg><span>읽음</span></button></div><button class="explain" data-detail="${r.id}">왜 이 순위일까? · ${fmt(r.score)}</button><a class="source-mini" href="${sourceUrl(c)}" target="_blank" rel="noopener" aria-label="연구 데이터 원문 ${c.sourceLine}행">원문 ↗</a></div></article>`;
  }).join(''):'<div class="empty">이 조건에 맞는 글이 없어요.<br>검색어나 필터를 바꾸거나 전체 피드로 돌아가 주세요.</div>';
+ if(feedStart){const back=document.createElement('button');back.className='rank-window-back';back.textContent=`${feedStart+1}위부터 보기 · 1위로 돌아가기`;back.onclick=()=>{clearRankHop();feedStart=0;visible=20;renderFeed();$('feed').scrollTop=0;};$('feed').prepend(back);}
  $('load-more').hidden=visible>=rows.length;
 }
 function renderDetail(id){
@@ -58,6 +61,31 @@ function renderDetail(id){
  const all=r.components.slice().sort((a,b)=>Math.abs(b.value)-Math.abs(a.value)),max=Math.max(...all.map(t=>Math.abs(t.value)),.00001);
  $('detail').innerHTML=`<h3>${r.rank}위는 어떻게 정해졌을까?</h3><p lang="ko">${esc(postText(r.c).slice(0,140))}</p><p>${r.c.signalsSource}</p><div class="score-equation">① 예상값 × 가중치 합 <strong>${fmt(r.raw)}</strong><br>② 음수 처리 후 <strong>${fmt(r.base)}</strong><br>③ 작성자 배율 <strong>× ${fmt(r.diversity)}</strong><br>④ 팔로우 밖 배율 <strong>× ${fmt(r.oon)}</strong><br>최종 점수 <strong>${fmt(r.score)}</strong></div><p class="micro">${options.multiplierPreOffset?'배율을 먼저 적용한 뒤 음수 처리합니다. 음수 원점수에는 배율을 곱하지 않습니다. 위 ②는 비교용 중간값입니다.':'음수 처리 후 작성자·팔로우 밖 배율을 곱합니다.'} 동일 점수는 글 ID 순서로 고정합니다.</p><p class="micro">같은 그룹에서 점수 순서상 ${r.authorPosition+1}번째. 실제 작성자 정보가 아니라 실험용 그룹입니다.</p><h3>점수에 더해진 값</h3>${all.map(t=>`<div class="contribution"><div class="contribution-head"><span>${HEADS[t.key]}</span><b>${t.value>=0?'+':''}${fmt(t.value)}</b></div><div class="contribution-track"><div class="contribution-bar ${t.value<0?'neg':''}" style="width:${Math.abs(t.value)/max*100}%"></div></div><small>${fmt(t.input)} × ${fmt(t.weight)}${!CONT.includes(t.key)?' (예상 확률 × 가중치)':' (시간 관련 입력 × 가중치)'}</small></div>`).join('')}<p class="micro">영상 정보가 없는 데이터이므로 영상 항목은 0입니다. 조건을 만족하지 않는 항목도 적용 가중치가 0입니다. 실제 좋아요·조회수는 수집되지 않았으며 계산에 사용하지 않습니다.</p>`;
 }
+function clearRankHop(){cancelAnimationFrame(hopFrame);hopAnimating=false;document.querySelectorAll('.rank-hop-tip,.rank-hop-empty').forEach(el=>el.remove());document.querySelectorAll('.rank-hop-target').forEach(el=>el.classList.remove('rank-hop-target'));window.rankHopSnapshot=null;}
+function revealRank(d){
+ clearRankHop();const index=rows.findIndex(r=>r.id===d.id),feed=$('feed');
+ $('controls-pane').classList.remove('open');$('inspector-pane').classList.remove('open');
+ const source=Number(d.sourceRank);if(!Number.isInteger(source)||source<1)return;
+ if(index<0){const note=document.createElement('div');note.className='rank-hop-empty';note.setAttribute('role','status');note.textContent=`트위터 ${source.toLocaleString()}위 → X 후보 제외 · 현재 X의 필터·저장 목록·읽음 제외 조건에 포함되지 않는 글입니다.`;const close=document.createElement('button');close.textContent='닫기';close.onclick=()=>note.remove();note.append(close);document.querySelector('.phone').append(note);window.rankHopSnapshot={id:d.id,sourceRank:source,targetRank:null,phase:'excluded'};return;}
+ // Jump to a bounded neighborhood, then visibly scroll through actual neighbors.
+ // Never materialize thousands of cards just to locate a low-ranked post.
+ const row=rows[index];selected=row.id;hopAnimating=true;
+ const already=Array.from(feed.querySelectorAll('.post')).find(el=>el.dataset.id===d.id);
+ if(!already){feedStart=Math.max(0,index-4);visible=Math.min(rows.length,index+16);renderFeed();feed.scrollTop=0;}
+ const target=Array.from(feed.querySelectorAll('.post')).find(el=>el.dataset.id===d.id);
+ target.classList.add('rank-hop-target');
+ const tip=document.createElement('div');tip.className='rank-hop-tip';tip.setAttribute('role','status');
+ const delta=source-row.rank;tip.innerHTML=`<button class="rank-hop-close" aria-label="순위 말풍선 닫기">×</button><strong>트위터 ${source.toLocaleString()}위 → X ${row.rank.toLocaleString()}위</strong><span>${delta>0?delta.toLocaleString()+'계단 상승':delta<0?(-delta).toLocaleString()+'계단 하락':'같은 순위'} · 현재 실험 설정 기준</span>`;
+ target.querySelector('.post-content').prepend(tip);tip.querySelector('button').onclick=()=>clearRankHop();
+ const start=feed.scrollTop,destination=Math.max(0,Math.min(feed.scrollHeight-feed.clientHeight,target.offsetTop-feed.offsetTop-18));
+ const duration=matchMedia('(prefers-reduced-motion: reduce)').matches?0:950,began=performance.now();
+ window.rankHopSnapshot={id:d.id,sourceRank:source,targetRank:row.rank,phase:'scrolling',rendered:feed.querySelectorAll('.post').length};
+ function tick(now){const t=duration?Math.min(1,(now-began)/duration):1;feed.scrollTop=start+(destination-start)*(1-Math.pow(1-t,3));if(t<1){hopFrame=requestAnimationFrame(tick);}else{hopAnimating=false;tip.classList.add('visible');window.rankHopSnapshot.phase='arrived';}}
+ hopFrame=requestAnimationFrame(tick);
+}
+function comparePost(article){const row=rows.find(r=>r.id===article?.dataset.id);if(ERA!=='2023'||!row||window.parent===window)return;document.querySelectorAll('.post').forEach(el=>el.classList.toggle('selected',el===article));window.parent.postMessage({type:'lab-selected',id:row.id,text:postText(row.c),navigate:true},'*');}
+document.addEventListener('click',event=>{const article=event.target.closest('.post');if(article&&!event.target.closest('button,a,details,input,select'))comparePost(article);});
+document.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.matches('.post-text[role=button]')){event.preventDefault();comparePost(event.target.closest('.post'));}if(event.key==='Escape')clearRankHop();});
 function chooseDetail(id){if(window.parent!==window){const row=rows.find(r=>r.id===id);if(row)window.parent.postMessage({type:'lab-selected',id,text:postText(row.c)},'*');}selected=id;renderDetail(id);document.querySelectorAll('.post').forEach(e=>e.classList.toggle('selected',e.dataset.id===id));openInspector();}
 document.addEventListener('click',e=>{
  const detail=e.target.closest('[data-detail]');if(detail)chooseDetail(detail.dataset.detail);
@@ -118,6 +146,8 @@ if(window.parent!==window){
   const d=event.data;
   if(d.action==='shared'){persona=d.persona||'balanced';query=d.query||'';following=!!d.following;savedMode=false;seen.clear();options.excludeSeen=false;$('excludeSeen').checked=false;$('persona').value=persona;$('search').value=query;candidates=raw.map(p=>simulate(p,persona));visible=20;baselineDirty=true;recompute();}
   if(d.action==='reset')reset();
+  if(d.action==='rank-hop')revealRank(d);
+  if(d.action==='clear-rank-hop')clearRankHop();
   if(d.action==='controls')openControls();
   if(d.action==='inspect')openInspector();
   if(d.action==='rank-labels')document.body.classList.toggle('show-ranks',!!d.enabled);
@@ -134,7 +164,7 @@ if(new URLSearchParams(location.search).has('device')||window.__PHONE_SKIN__){
  for(const [label,path]of routes){const b=document.createElement('button');b.setAttribute('aria-label',label);b.innerHTML='<svg viewBox="0 0 24 24">'+path+'</svg>';b.onclick=()=>toast(label+'는 이 읽기·추천 체험에서 제공하지 않아요.');nav.append(b);}
  const compose=document.createElement('button');compose.className='compose-fab';compose.setAttribute('aria-label',ERA==='2023'?'트윗 작성 안내':'게시물 작성 안내');compose.textContent='+';compose.onclick=()=>toast('실제 게시 없이 추천 순서를 살펴보는 체험입니다.');document.querySelector('.phone').append(compose);
  $('nav-search').onclick=()=>{window.parent.postMessage({type:'lab-search-request'},'*');};
- $('feed').addEventListener('scroll',()=>{const f=$('feed');if(f.scrollHeight-f.scrollTop-f.clientHeight<180&&visible<rows.length){visible+=20;renderFeed();}},{passive:true});
+ $('feed').addEventListener('scroll',()=>{const f=$('feed');if(!hopAnimating&&f.scrollHeight-f.scrollTop-f.clientHeight<180&&visible<rows.length){visible+=20;renderFeed();}},{passive:true});
  // Keep the frame controls reachable without inventing real account activity.
  window.parent.postMessage({type:'lab-ready',year:ERA},'*');
 }
