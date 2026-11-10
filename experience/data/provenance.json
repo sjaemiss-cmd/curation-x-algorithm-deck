@@ -21,5 +21,5 @@
   "reference": "https://github.com/cardiffnlp/tweeteval",
   "paper": "https://aclanthology.org/2020.findings-emnlp.148/",
   "originalDatasetPaper": "https://aclanthology.org/S17-2088/",
-  "licenseNote": "TweetEval refers users to original task licenses and Twitter regulations. Local educational prototype; no public redistribution performed."
+  "licenseNote": "TweetEval refers users to original task licenses and Twitter regulations. Used in an educational comparison app; source URLs and row origins retained."
 }

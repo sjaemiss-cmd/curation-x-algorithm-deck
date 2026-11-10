@@ -1,5 +1,5 @@
-import * as x from './engine.mjs';
-import * as twitter from './twitter-engine.mjs';
+import * as x from './engine.mjs?v=ko1';
+import * as twitter from './twitter-engine.mjs?v=ko1';
 export const ERA=new URLSearchParams(location.search).get('year')==='2023'?'2023':'2026';
 const active=ERA==='2023'?twitter:x;
 export const {HEADS,NEG,CONT,DEFAULT_OPTIONS,validateWeights,rank,simulate}=active;

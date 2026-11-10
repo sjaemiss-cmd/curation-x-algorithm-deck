@@ -34,7 +34,7 @@ export const diversityMultiplier=(decay,floor,exponent)=>(1-floor)*decay**expone
 export function rank(candidates,w,o=DEFAULT_OPTIONS,filters={}){
  const rows=[];let excluded=0;
  for(const c of candidates){
-  if((o.excludeSeen&&filters.seen?.has(c.id))||(filters.following&&!c.inNetwork)||(filters.query&&!c.text.toLowerCase().includes(filters.query.toLowerCase()))){excluded++;continue;}
+  if((o.excludeSeen&&filters.seen?.has(c.id))||(filters.following&&!c.inNetwork)||(filters.query&&!c.text.toLowerCase().includes(filters.query.toLowerCase())&&!(c.text_ko||'').toLowerCase().includes(filters.query.toLowerCase()))){excluded++;continue;}
   const components=terms(c,w,o);const raw=components.reduce((s,t)=>s+t.value,0);
   rows.push({id:c.id,c,raw,base:offsetScore(raw,w),score:0,components});
  }

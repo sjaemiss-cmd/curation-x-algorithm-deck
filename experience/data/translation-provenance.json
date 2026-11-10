@@ -1,0 +1,25 @@
+{
+  "language": "ko",
+  "method": "Parallel machine translation: gpt-6.1-terra medium (4554 posts), gpt-6-luna low (5446 posts), with sampled review",
+  "workers_in_parallel": 3,
+  "source_sha256": "ca82681daaad0371c6a8574fd1902cf40b7ed097109ee2ba37f5b86c337759e8",
+  "count": 10000,
+  "original_preserved": true,
+  "ranking_inputs": "original English text; unchanged",
+  "updated_at": "2026-11-10T15:15:46.453231+09:00",
+  "coverage": {
+    "total": 10000,
+    "translated": 10000,
+    "missing": 0,
+    "extra": [],
+    "duplicates": [],
+    "empty": [],
+    "placeholders": [],
+    "unchanged": [],
+    "no_korean": [],
+    "encoding_damage": [],
+    "mention_mismatch": [],
+    "hashtag_mismatch": []
+  },
+  "quality_note": "Machine translation. Ambiguity, slang and names may be mistranslated; original available per post."
+}

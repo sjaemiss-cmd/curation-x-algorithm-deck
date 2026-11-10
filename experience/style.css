@@ -2,3 +2,5 @@
 
 [hidden]{display:none!important}
 .embedded .masthead{display:none}.embedded .phone-caption{display:none}.embedded .phone-nav{display:none}.embedded .phone{border:0;border-radius:0}.embedded .phone-column{max-width:none}.embedded .workspace{max-width:none}.embedded .field:has(#persona),.embedded .field:has(#persona)+.micro{display:none}.embedded #search-wrap,.embedded .check:has(#excludeSeen){display:none!important}.embedded .feed-tabs{pointer-events:none}.embedded .post-actions{display:none}.embedded .controls-pane,.embedded .inspector-pane{max-width:none}.embedded .phone .feed{max-height:none}.twitter-era{--blue:#1da1f2}.twitter-era .phone-top{background:#fafdff}.twitter-era .feed-tabs button.selected{color:#1da1f2}
+
+.original-text{font-size:11px;color:var(--sub);margin:4px 0 10px}.original-text summary{cursor:pointer}.original-text p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;padding:10px 0}.post-text[lang=ko]{line-height:1.65;word-break:keep-all}
