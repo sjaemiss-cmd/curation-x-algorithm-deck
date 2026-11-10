@@ -8,6 +8,11 @@ const section=document.querySelector('.device-section');
 const status=document.getElementById('stage-status');
 const screenElements=['2023','2026'].map(year=>document.getElementById('screen-'+year));
 let focusEra='2023',api=null;
+const presentationToggle=document.getElementById('presentation-mode');
+presentationToggle?.addEventListener('click',()=>{const enabled=document.body.classList.toggle('presentation-mode');presentationToggle.setAttribute('aria-pressed',String(enabled));presentationToggle.textContent=enabled?'상세 실험':'발표 화면';window.scrollTo({top:0,behavior:'instant'});});
+document.getElementById('fullscreen-stage')?.addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{status.textContent='브라우저 전체 화면 단축키를 사용해 주세요.';}});
+document.addEventListener('fullscreenchange',()=>{const button=document.getElementById('fullscreen-stage');if(button)button.textContent=document.fullscreenElement?'전체 화면 해제':'전체 화면';});
+new ResizeObserver(()=>{const count=innerWidth<=760?1:2;stage.style.setProperty('--fallback-scale',Math.min(1,(stage.clientHeight-35)/710,(stage.clientWidth-30)/(count*350)));}).observe(stage);
 function command(year,action,extra={}){document.getElementById('frame-'+year).contentWindow?.postMessage({type:'lab-command',action,...extra},'*');}
 document.querySelectorAll('[data-device-action]').forEach(b=>b.onclick=()=>{api?.front();stage.scrollIntoView({block:'center',behavior:'instant'});command(b.dataset.era,b.dataset.deviceAction);});
 document.getElementById('show-rank-labels').onchange=e=>['2023','2026'].forEach(y=>command(y,'rank-labels',{enabled:e.target.checked}));
@@ -15,7 +20,7 @@ document.querySelectorAll('[data-focus-era]').forEach(b=>b.onclick=()=>{
  focusEra=b.dataset.focusEra;section.classList.toggle('focus-2026',focusEra==='2026');
  document.querySelectorAll('[data-focus-era]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));api?.focus();
 });
-window.addEventListener('rank-hop-focus',event=>{const targetEra=event.detail?.targetEra;if(!['2023','2026'].includes(targetEra))return;api?.front();if(stage.clientWidth<=760)document.querySelector(`[data-focus-era="${targetEra}"]`).click();stage.scrollIntoView({block:'center',behavior:'instant'});});
+window.addEventListener('rank-hop-focus',event=>{const targetEra=event.detail?.targetEra;if(!['2023','2026'].includes(targetEra))return;api?.front();if(innerWidth<=760)document.querySelector(`[data-focus-era="${targetEra}"]`).click();stage.scrollIntoView({block:'center',behavior:'instant'});});
 // Each child can reload when its CSS3D surface first enters the scene.
 window.addEventListener('message',e=>{if(e.data?.type==='lab-ready'){const year=['2023','2026'].find(y=>document.getElementById('frame-'+y).contentWindow===e.source);if(year)command(year,'rank-labels',{enabled:document.getElementById('show-rank-labels').checked});}});
 function fallback(message){stage.dataset.phase='fallback';status.textContent=message;document.getElementById('skip-stage').hidden=true;document.getElementById('turn-phones').hidden=true;document.getElementById('replay-stage').disabled=true;window.phoneStageSnapshot={mode:'fallback',phase:'ready',reason:message};}
@@ -103,7 +108,7 @@ function start(){
  }
  function wake(){cancelAnimationFrame(raf);raf=requestAnimationFrame(render);}
  function animate(nextKind,nextBack=false,ms=1100){kind=nextKind;back=nextBack;stage.dataset.phase='animating';snapshot('animating');phones.forEach(p=>{p.fromX=p.group.position.x;p.fromY=p.group.rotation.y;});animationStart=performance.now();duration=reduced.matches?0:ms;document.getElementById('turn-phones').setAttribute('aria-pressed',String(back));document.getElementById('turn-phones').textContent=back?'화면으로 돌아오기':'기기 뒷면 보기';wake();}
- function resize(){width=stage.clientWidth;height=stage.clientHeight;mobile=width<=760;const viewHeight=mobile?7.35:7.5;const viewWidth=viewHeight*width/height;camera.left=-viewWidth/2;camera.right=viewWidth/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();renderer.setSize(width,height);cssRenderer.setSize(width,height);wake();}
+ function resize(){width=stage.clientWidth;height=stage.clientHeight;mobile=innerWidth<=760;const viewHeight=mobile?7.35:Math.max(7.5,8*height/width);section.style.setProperty('--phone-label-width',`${8.88*height/viewHeight}px`);const viewWidth=viewHeight*width/height;camera.left=-viewWidth/2;camera.right=viewWidth/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();renderer.setSize(width,height);cssRenderer.setSize(width,height);wake();}
  api={front:()=>{if(back)animate('turn',false);},focus:()=>animate('focus',false,600)};
  document.getElementById('replay-stage').onclick=()=>{stage.scrollIntoView({block:'center',behavior:'instant'});back=false;kind='intro';animationStart=performance.now();duration=reduced.matches?0:4200;document.getElementById('skip-stage').hidden=reduced.matches;document.getElementById('turn-phones').setAttribute('aria-pressed','false');document.getElementById('turn-phones').textContent='기기 뒷면 보기';wake();};
  document.getElementById('skip-stage').onclick=()=>{animationStart=performance.now()-10000;wake();};
