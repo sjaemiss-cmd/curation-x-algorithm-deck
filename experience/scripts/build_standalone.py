@@ -3,7 +3,7 @@ import re,json,hashlib,html as html_lib
 root=Path(__file__).resolve().parents[1]
 read=lambda name:(root/name).read_text(encoding='utf8')
 def version_assets(document):
- return re.sub(r'((?:src|href)="[^"?#]+\.(?:css|mjs|js|html))(\?[^"#]*)?"',lambda m:m[1]+(m[2]+'&amp;' if m[2] else '?')+'v=hop1"',document)
+ return re.sub(r'((?:src|href)="[^"?#]+\.(?:css|mjs|js|html))(\?[^"#]*)?"',lambda m:m[1]+(m[2]+'&amp;' if m[2] else '?')+'v=finish1"',document)
 template=read('single-template.html')
 (root/'single.html').write_text(version_assets(template),encoding='utf8')
 data={f'data/{n}':json.loads(read('data/'+n)) for n in ['posts.json','posts.ko.json','source-defaults.json','twitter-2023-defaults.json','provenance.json']}

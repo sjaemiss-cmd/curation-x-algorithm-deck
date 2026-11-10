@@ -20,25 +20,42 @@ window.addEventListener('rank-hop-focus',()=>{api?.front();if(stage.clientWidth<
 window.addEventListener('message',e=>{if(e.data?.type==='lab-ready'){const year=['2023','2026'].find(y=>document.getElementById('frame-'+y).contentWindow===e.source);if(year)command(year,'rank-labels',{enabled:document.getElementById('show-rank-labels').checked});}});
 function fallback(message){stage.dataset.phase='fallback';status.textContent=message;document.getElementById('skip-stage').hidden=true;document.getElementById('turn-phones').hidden=true;document.getElementById('replay-stage').disabled=true;window.phoneStageSnapshot={mode:'fallback',phase:'ready',reason:message};}
 function roundShape(w,h,r){const s=new THREE.Shape(),x=-w/2,y=-h/2;s.moveTo(x+r,y);s.lineTo(x+w-r,y);s.quadraticCurveTo(x+w,y,x+w,y+r);s.lineTo(x+w,y+h-r);s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);s.lineTo(x+r,y+h);s.quadraticCurveTo(x,y+h,x,y+h-r);s.lineTo(x,y+r);s.quadraticCurveTo(x,y,x+r,y);return s;}
-function rounded(w,h,d,r,mat){const g=new THREE.ExtrudeGeometry(roundShape(w,h,r),{depth:d-.04,bevelEnabled:true,bevelThickness:.02,bevelSize:.02,bevelSegments:3,steps:1,curveSegments:10});g.translate(0,0,-(d-.04)/2);return new THREE.Mesh(g,mat);}
+function rounded(w,h,d,r,mat){const bevel=Math.min(.025,d*.22);const depth=d-2*bevel;const g=new THREE.ExtrudeGeometry(roundShape(w,h,r),{depth,bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel,bevelSegments:5,steps:1,curveSegments:24});g.translate(0,0,-depth/2);const uv=g.attributes.uv,pos=g.attributes.position;for(let i=0;i<uv.count;i++)uv.setXY(i,pos.getX(i)/w+.5,pos.getY(i)/h+.5);return new THREE.Mesh(g,mat);}
+// Small deterministic surface maps: no network textures or per-frame work.
+function surfaceTexture(brushed=false){
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=256;
+ const ctx=canvas.getContext('2d'),pixels=ctx.createImageData(256,256);let seed=731;
+ const noise=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+ for(let y=0;y<256;y++){const line=noise();for(let x=0;x<256;x++){const value=Math.round(178+(brushed?(line-.5)*23+(noise()-.5)*5:(noise()-.5)*20));const i=(y*256+x)*4;pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=value;pixels.data[i+3]=255;}}
+ ctx.putImageData(pixels,0,0);const texture=new THREE.CanvasTexture(canvas);texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(brushed?2:3,brushed?8:6);return texture;
+}
+const brushedTexture=surfaceTexture(true),frostedTexture=surfaceTexture();
+function satinFinish(){const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');const gradient=ctx.createLinearGradient(0,0,256,210);gradient.addColorStop(0,'#d2d2d2');gradient.addColorStop(.3,'#f4f4f4');gradient.addColorStop(.52,'#e8e8e8');gradient.addColorStop(1,'#bcbcbc');ctx.fillStyle=gradient;ctx.fillRect(0,0,256,256);const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;return texture;}
+const satinTexture=satinFinish();
+function edgeTrim(w,h,r,z,material){const shape=roundShape(w,h,r);shape.holes.push(new THREE.Path(roundShape(w-.035,h-.035,r-.0175).getPoints(24)));const mesh=new THREE.Mesh(new THREE.ShapeGeometry(shape,24),material);mesh.position.z=z;return mesh;}
 function phone(year,scene,cssScene){
  const modern=year==='2026',w=(modern?71.9:70.6)/23,h=(modern?150:146.6)/23,d=(modern?8.75:8.25)/23;
  const group=new THREE.Group();scene.add(group);
- const metal=new THREE.MeshStandardMaterial({color:modern?0x784555:0xa9a397,metalness:.87,roughness:.28});
- const glass=new THREE.MeshPhysicalMaterial({color:modern?0x361c28:0x77756f,metalness:.3,roughness:.38,clearcoat:1,clearcoatRoughness:.25});
+ const metal=new THREE.MeshStandardMaterial({color:modern?0x623b48:0x9d998e,metalness:1,roughness:modern?.38:.42,roughnessMap:brushedTexture,bumpMap:brushedTexture,bumpScale:.0018,envMapIntensity:1.15});
+ const glass=new THREE.MeshPhysicalMaterial({color:modern?0x482632:0x8c8980,map:satinTexture,metalness:modern?.45:.08,roughness:.58,roughnessMap:frostedTexture,bumpMap:frostedTexture,bumpScale:.0012,clearcoat:.42,clearcoatRoughness:.3,envMapIntensity:.85});
+ const polished=new THREE.MeshStandardMaterial({color:modern?0xa27a89:0xd2cdc1,metalness:1,roughness:.18,envMapIntensity:1.3,side:THREE.DoubleSide});
  const black=new THREE.MeshStandardMaterial({color:0x08090c,metalness:.35,roughness:.18});
  const body=rounded(w,h,d,.34,metal);group.add(body);
  const back=rounded(w-.085,h-.085,.035,.33,glass);back.position.z=-d/2-.006;group.add(back);
  const face=rounded(w-.065,h-.065,.035,.33,black);face.position.z=d/2;group.add(face);
+ group.add(edgeTrim(w-.012,h-.012,.34,d/2+.009,polished));group.add(edgeTrim(w-.055,h-.055,.33,-d/2-.027,polished));
  // The newer chassis uses the wide camera plateau; both retain the triple-lens layout.
  const plate=rounded(modern?w-.16:1.53,1.55,.14,.28,metal);plate.position.set(modern?0:.61,h/2-.91,-d/2-.09);group.add(plate);
- const lensMat=new THREE.MeshPhysicalMaterial({color:0x0b1220,metalness:.8,roughness:.08,clearcoat:1});
+ const lensMat=new THREE.MeshPhysicalMaterial({color:0x101d2a,metalness:.35,roughness:.09,clearcoat:1,clearcoatRoughness:.045,iridescence:.65,iridescenceIOR:1.38,iridescenceThicknessRange:[180,360],envMapIntensity:1.6});
+ const irisMat=new THREE.MeshStandardMaterial({color:0x254658,metalness:.65,roughness:.24,side:THREE.DoubleSide});
  const lensPositions=[[.91,h/2-.56],[.91,h/2-1.23],[.27,h/2-.90]];
  for(const [x,y]of lensPositions){
-  const ring=new THREE.Mesh(new THREE.CylinderGeometry(.286,.286,.14,48),metal);ring.rotation.x=Math.PI/2;ring.position.set(x,y,-d/2-.23);group.add(ring);
+  const ring=new THREE.Mesh(new THREE.CylinderGeometry(.286,.276,.14,64),metal);ring.rotation.x=Math.PI/2;ring.position.set(x,y,-d/2-.23);group.add(ring);
+  const lip=new THREE.Mesh(new THREE.TorusGeometry(.263,.012,8,64),polished);lip.position.set(x,y,-d/2-.307);group.add(lip);
   const lens=new THREE.Mesh(new THREE.CylinderGeometry(.235,.235,.155,48),black);lens.rotation.x=Math.PI/2;lens.position.set(x,y,-d/2-.25);group.add(lens);
   const optic=new THREE.Mesh(new THREE.SphereGeometry(.17,24,16),lensMat);optic.scale.z=.25;optic.position.set(x,y,-d/2-.337);group.add(optic);
-  const iris=new THREE.Mesh(new THREE.RingGeometry(.09,.13,40),new THREE.MeshBasicMaterial({color:0x354565,side:THREE.DoubleSide}));iris.position.set(x,y,-d/2-.382);group.add(iris);
+  const iris=new THREE.Mesh(new THREE.RingGeometry(.075,.119,48),irisMat);iris.position.set(x,y,-d/2-.382);group.add(iris);
+  const pupil=new THREE.Mesh(new THREE.CircleGeometry(.067,40),new THREE.MeshBasicMaterial({color:0x02060a,side:THREE.DoubleSide}));pupil.position.set(x,y,-d/2-.385);group.add(pupil);
  }
  for(const [x,y,r,color]of [[modern?-.93:-.02,h/2-.52,.10,0xe1ddd1],[modern?-.94:-.03,h/2-1.24,.08,0x121219]]){const disc=new THREE.Mesh(new THREE.CylinderGeometry(r,r,.03,24),new THREE.MeshStandardMaterial({color,roughness:.3}));disc.rotation.x=Math.PI/2;disc.position.set(x,y,-d/2-.19);group.add(disc);}
  // Raised physical keys, antenna breaks and the USB-C opening.
@@ -58,11 +75,14 @@ function start(){
  if(new URLSearchParams(location.search).has('no3d')){fallback('입체 효과 없이도 두 피드를 그대로 체험할 수 있습니다.');return;}
  let renderer;
  try{renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});}catch{fallback('이 기기에서는 입체 효과 대신 일반 목업으로 보여드립니다.');return;}
- renderer.setPixelRatio(Math.min(devicePixelRatio,1.25));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.35;renderer.domElement.className='webgl-stage';renderer.domElement.setAttribute('aria-hidden','true');stage.append(renderer.domElement);
+ renderer.setPixelRatio(Math.min(devicePixelRatio,1.25));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;renderer.domElement.className='webgl-stage';renderer.domElement.setAttribute('aria-hidden','true');stage.append(renderer.domElement);
  const scene=new THREE.Scene(),cssScene=new THREE.Scene();const camera=new THREE.OrthographicCamera(-6,6,3.8,-3.8,.1,100);camera.position.set(0,0,20);
  const cssRenderer=new CSS3DRenderer();cssRenderer.domElement.className='css-stage';stage.append(cssRenderer.domElement);
- const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;room.dispose();pmrem.dispose();
- scene.add(new THREE.HemisphereLight(0xc5e4ff,0x4f3244,2));const key=new THREE.DirectionalLight(0xffffff,3.0);key.position.set(-4,6,8);scene.add(key);const rim=new THREE.DirectionalLight(0x97cfff,2.5);rim.position.set(5,2,-4);scene.add(rim);
+ const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment();
+ const softboxes=[];
+ for(const [x,y,z,w,h,color,power]of [[-4,2,3,2,7,0xe5efff,5],[4,1,-3,1.2,6,0xffe0cf,4],[0,7,0,6,2,0xffffff,3]]){const light=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color,side:THREE.DoubleSide}));light.material.color.multiplyScalar(power);light.position.set(x,y,z);light.lookAt(0,0,0);room.add(light);softboxes.push(light);}
+ scene.environment=pmrem.fromScene(room,.055).texture;room.dispose();for(const light of softboxes){light.geometry.dispose();light.material.dispose();}pmrem.dispose();
+ scene.add(new THREE.HemisphereLight(0xd5e4f0,0x25202a,.65));const key=new THREE.DirectionalLight(0xfff1df,2.1);key.position.set(-4,6,8);scene.add(key);const rim=new THREE.DirectionalLight(0xb4d9ff,1.5);rim.position.set(5,2,-4);scene.add(rim);
  const phones=['2023','2026'].map(y=>phone(y,scene,cssScene));
  const dustGeo=new THREE.BufferGeometry();const positions=[];for(let i=0;i<90;i++){const n=i*2.399963;positions.push(Math.cos(n)*(2+i%9),Math.sin(n)*4,-2-(i%7));}dustGeo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));const dustMat=new THREE.PointsMaterial({size:.019,color:0x9fc4df,transparent:true,opacity:.4});const dust=new THREE.Points(dustGeo,dustMat);scene.add(dust);
  stage.classList.add('has-webgl');let mobile=false,width=0,height=0,raf=0,intersecting=true,animationStart=performance.now(),duration=reduced.matches?0:4200,kind='intro',back=false;
@@ -74,7 +94,7 @@ function start(){
    const p=phones[i],sign=i?1:-1;let k=t;
    if(kind==='intro'){
     k=duration?clamp((now-animationStart-i*220)/(duration-i*220),0,1):1;const e=ease(k);p.group.position.set(targetX(p)+sign*4.8*(1-e),-.65*(1-e)+Math.sin(k*Math.PI)*.28,-3*(1-e));p.group.rotation.set(.16*(1-e),sign*(Math.PI*1.18)*(1-e),-sign*.22*(1-e));
-   }else{const e=ease(t);p.group.position.x=THREE.MathUtils.lerp(p.fromX,targetX(p),e);p.group.position.y=0;p.group.position.z=0;p.group.rotation.set(0,THREE.MathUtils.lerp(p.fromY,back?Math.PI:0,e),0);}
+   }else{const e=ease(t);p.group.position.x=THREE.MathUtils.lerp(p.fromX,targetX(p),e);p.group.position.y=0;p.group.position.z=0;p.group.rotation.set(0,THREE.MathUtils.lerp(p.fromY,back?Math.PI+(p.year==='2023'?-.12:.12):0,e),0);}
    p.cssGroup.position.copy(p.group.position);p.cssGroup.quaternion.copy(p.group.quaternion);const visible=Math.cos(p.group.rotation.y)>.05&&(!mobile||p.year===focusEra);p.el.style.visibility=visible?'visible':'hidden';p.el.style.opacity=String(clamp((Math.cos(p.group.rotation.y)-.05)*2,0,1));p.el.inert=!visible||t<1;
   }
   dustMat.opacity=kind==='intro'?(1-t)*.5:0;dust.rotation.z=t*.15;
