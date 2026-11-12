@@ -3,3 +3,26 @@
 .post-text[role=button]{cursor:pointer}.post-text[role=button]:focus-visible{outline:2px solid #1d9bf0;outline-offset:4px}.rank-window-back{display:block;width:100%;padding:10px;border:0;border-bottom:1px solid #2f3336;background:#122531;color:#8fd2ff;font-size:11px}.device-ui .post.rank-hop-target{background:#082332;box-shadow:inset 3px 0 #1d9bf0}.rank-hop-tip{position:relative;margin:2px 0 16px;padding:13px 24px 13px 12px;background:#1d9bf0;color:white;border-radius:12px;opacity:0;transform:translateY(7px);transition:opacity .2s,transform .2s;font-size:13px;line-height:1.5;box-shadow:0 5px 18px #0003}.rank-hop-tip.visible{opacity:1;transform:none}.rank-hop-tip:after{content:'';position:absolute;bottom:-8px;left:18px;border-width:8px 8px 0;border-style:solid;border-color:#1d9bf0 transparent transparent}.rank-hop-tip strong,.rank-hop-tip span{display:block}.rank-hop-tip span{font-size:10px;opacity:.9;margin-top:3px}.rank-hop-close{position:absolute;right:3px;top:2px;background:transparent!important;border:0!important;color:white!important;padding:3px 7px!important;font-size:19px!important}.rank-hop-empty{position:absolute;z-index:9;top:150px;left:12px;right:12px;padding:18px;border-radius:14px;background:#1d9bf0;color:white;font-size:14px;box-shadow:0 4px 20px #0004}.rank-hop-empty button{display:block;margin-top:10px}.rank-hop-target .post-text{color:var(--ink)}
 
 .device-ui.twitter-era .post.rank-hop-target{background:#e8f5fd;box-shadow:inset 3px 0 #1d9bf0}
+
+/* Logical screen stays 360px wide; the stage supplies the presentation scale. */
+.device-ui .post-text[lang=ko]{font-size:19px;line-height:1.45}
+.device-ui .post-header strong{font-size:15px}
+.device-ui .feed-tabs button{font-size:16px}
+.device-ui .post .avatar{height:42px;min-width:42px;width:42px}
+.device-ui .post-actions svg{width:20px;height:20px}
+.device-ui.show-ranks .rank-strip{font-size:14px}.device-ui .rank-strip b{font-weight:750}
+.device-ui .rank-hop-tip strong{font-size:18px;font-weight:750}.device-ui .rank-hop-tip span{font-size:14px}
+.device-ui .rank-hop-empty{font-size:16px}.device-ui .rank-window-back{font-size:14px}
+.device-ui #toast{font-size:14px}
+.device-ui .controls-pane :is(p,small,label,button,input,select,summary,output,textarea,code),
+.device-ui .inspector-pane :is(p,small,span,label,button,input,summary,output,a,code),
+.device-ui .inspector-pane .contribution-head{font-size:14px}
+.device-ui .controls-pane.open,.device-ui .inspector-pane.open{overflow:auto;overscroll-behavior:contain}
+.device-ui .controls-pane .presets{flex-wrap:wrap}
+.device-ui .controls-pane .presets button{font-size:14px;padding:7px 8px}
+.device-ui .inspector-pane .section-label{font-size:14px}
+.device-ui .controls-pane,.device-ui .inspector-pane,.device-ui .inspector-pane .inspector-detail{font-size:14px}
+.device-ui .controls-pane .mobile-close,.device-ui .inspector-pane .mobile-close{font-size:26px}
+.device-ui.presentation-feed .post-handle,.device-ui.presentation-feed .original-text,
+.device-ui.presentation-feed .explain,.device-ui.presentation-feed .source-mini{display:none!important}
+.device-ui.presentation-feed .profile-dot{font-size:14px}

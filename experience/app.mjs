@@ -151,6 +151,7 @@ if(window.parent!==window){
   if(d.action==='clear-rank-hop')clearRankHop();
   if(d.action==='controls')openControls();
   if(d.action==='inspect')openInspector();
+  if(d.action==='presentation')document.body.classList.toggle('presentation-feed',!!d.enabled);
   if(d.action==='rank-labels')document.body.classList.toggle('show-ranks',!!d.enabled);
  });
 }

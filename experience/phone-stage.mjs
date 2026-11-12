@@ -9,7 +9,27 @@ const status=document.getElementById('stage-status');
 const screenElements=['2023','2026'].map(year=>document.getElementById('screen-'+year));
 let focusEra='2023',api=null;
 const presentationToggle=document.getElementById('presentation-mode');
-presentationToggle?.addEventListener('click',()=>{const enabled=document.body.classList.toggle('presentation-mode');presentationToggle.setAttribute('aria-pressed',String(enabled));presentationToggle.textContent=enabled?'상세 실험':'발표 화면';window.scrollTo({top:0,behavior:'instant'});});
+const presentationDesktop=matchMedia('(min-width:761px)');
+function syncPresentation(){
+ const enabled=document.body.classList.contains('presentation-mode')&&presentationDesktop.matches;
+ ['2023','2026'].forEach(year=>command(year,'presentation',{enabled}));
+ document.querySelectorAll('[data-presentation-label]').forEach(el=>{el.textContent=enabled?el.dataset.presentationLabel:el.dataset.detailLabel;});
+ updateTurnLabel();
+ updatePresentationStats();
+}
+function updatePresentationStats(){
+ const snapshot=window.comparisonSnapshot;if(!snapshot)return;
+ const enabled=document.body.classList.contains('presentation-mode')&&presentationDesktop.matches;
+ const set=(id,text)=>{const el=document.getElementById(id);if(el.textContent!==text)el.textContent=text;};
+ set('same-pool',snapshot.samePool?snapshot.count.toLocaleString()+(enabled?'':'개 동일'):'조건 갱신 중');
+ document.querySelector('.selected-compare').dataset.selected=String(!!snapshot.selected);
+ if(snapshot.selected)for(const year of ['2023','2026']){const rank=snapshot.states[year].ranks[snapshot.selected];set('selected-'+year.slice(2),rank?rank.toLocaleString()+(enabled?'':'위'):(enabled?'제외':'후보 제외'));}
+}
+function updateTurnLabel(){const button=document.getElementById('turn-phones'),back=button.getAttribute('aria-pressed')==='true';button.textContent=document.body.classList.contains('presentation-mode')&&presentationDesktop.matches?(back?'화면 보기':'뒷면 보기'):(back?'화면으로 돌아오기':'기기 뒷면 보기');}
+presentationToggle?.addEventListener('click',()=>{const enabled=document.body.classList.toggle('presentation-mode');presentationToggle.setAttribute('aria-pressed',String(enabled));presentationToggle.textContent=enabled?'상세 실험':'발표 화면';syncPresentation();window.scrollTo({top:0,behavior:'instant'});});
+presentationDesktop.addEventListener('change',syncPresentation);
+syncPresentation();
+new MutationObserver(updatePresentationStats).observe(document.querySelector('.experiment'),{childList:true,subtree:true});
 document.getElementById('fullscreen-stage')?.addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{status.textContent='브라우저 전체 화면 단축키를 사용해 주세요.';}});
 document.addEventListener('fullscreenchange',()=>{const button=document.getElementById('fullscreen-stage');if(button)button.textContent=document.fullscreenElement?'전체 화면 해제':'전체 화면';});
 new ResizeObserver(()=>{const count=innerWidth<=760?1:2;stage.style.setProperty('--fallback-scale',Math.min(1,(stage.clientHeight-35)/710,(stage.clientWidth-30)/(count*350)));}).observe(stage);
@@ -22,7 +42,7 @@ document.querySelectorAll('[data-focus-era]').forEach(b=>b.onclick=()=>{
 });
 window.addEventListener('rank-hop-focus',event=>{const targetEra=event.detail?.targetEra;if(!['2023','2026'].includes(targetEra))return;api?.front();if(innerWidth<=760)document.querySelector(`[data-focus-era="${targetEra}"]`).click();stage.scrollIntoView({block:'center',behavior:'instant'});});
 // Each child can reload when its CSS3D surface first enters the scene.
-window.addEventListener('message',e=>{if(e.data?.type==='lab-ready'){const year=['2023','2026'].find(y=>document.getElementById('frame-'+y).contentWindow===e.source);if(year)command(year,'rank-labels',{enabled:document.getElementById('show-rank-labels').checked});}});
+window.addEventListener('message',e=>{if(e.data?.type==='lab-ready'){const year=['2023','2026'].find(y=>document.getElementById('frame-'+y).contentWindow===e.source);if(year){command(year,'rank-labels',{enabled:document.getElementById('show-rank-labels').checked});command(year,'presentation',{enabled:document.body.classList.contains('presentation-mode')&&presentationDesktop.matches});}}});
 function fallback(message){stage.dataset.phase='fallback';status.textContent=message;document.getElementById('skip-stage').hidden=true;document.getElementById('turn-phones').hidden=true;document.getElementById('replay-stage').disabled=true;window.phoneStageSnapshot={mode:'fallback',phase:'ready',reason:message};}
 function roundShape(w,h,r){const s=new THREE.Shape(),x=-w/2,y=-h/2;s.moveTo(x+r,y);s.lineTo(x+w-r,y);s.quadraticCurveTo(x+w,y,x+w,y+r);s.lineTo(x+w,y+h-r);s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);s.lineTo(x+r,y+h);s.quadraticCurveTo(x,y+h,x,y+h-r);s.lineTo(x,y+r);s.quadraticCurveTo(x,y,x+r,y);return s;}
 function rounded(w,h,d,r,mat){const bevel=Math.min(.025,d*.22);const depth=d-2*bevel;const g=new THREE.ExtrudeGeometry(roundShape(w,h,r),{depth,bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel,bevelSegments:5,steps:1,curveSegments:24});g.translate(0,0,-depth/2);const uv=g.attributes.uv,pos=g.attributes.position;for(let i=0;i<uv.count;i++)uv.setXY(i,pos.getX(i)/w+.5,pos.getY(i)/h+.5);return new THREE.Mesh(g,mat);}
@@ -93,7 +113,7 @@ function start(){
  stage.classList.add('has-webgl');let mobile=false,width=0,height=0,raf=0,intersecting=true,animationStart=performance.now(),duration=reduced.matches?0:4200,kind='intro',back=false;
  const ease=t=>1-Math.pow(1-t,3),clamp=THREE.MathUtils.clamp;
  const targetX=p=>mobile?(p.year===focusEra?0:(p.year==='2023'?-5:5)):(p.year==='2023'?-2.22:2.22);
- function snapshot(phase){window.phoneStageSnapshot={mode:'three',phase,revision:THREE.REVISION,focused:focusEra,back,reducedMotion:reduced.matches,canvas:{width,height},phones:phones.map(p=>({year:p.year,rotationY:p.group.rotation.y,x:p.group.position.x,visible:p.el.style.visibility!=='hidden'}))};}
+ function snapshot(phase){window.phoneStageSnapshot={mode:'three',phase,revision:THREE.REVISION,focused:focusEra,back,reducedMotion:reduced.matches,canvas:{width,height},phones:phones.map(p=>{const box=new THREE.Box3().setFromObject(p.group),points=[];for(const x of [box.min.x,box.max.x])for(const y of [box.min.y,box.max.y])for(const z of [box.min.z,box.max.z])points.push(new THREE.Vector3(x,y,z).project(camera));const left=(Math.min(...points.map(v=>v.x))+1)*width/2,right=(Math.max(...points.map(v=>v.x))+1)*width/2,top=(1-Math.max(...points.map(v=>v.y)))*height/2,bottom=(1-Math.min(...points.map(v=>v.y)))*height/2;return {year:p.year,rotationY:p.group.rotation.y,x:p.group.position.x,visible:p.el.style.visibility!=='hidden',bodyHeight:p.h*height/(camera.top-camera.bottom),bounds:{left,right,top,bottom,height:bottom-top}};})};}
  function render(now){raf=0;if(!intersecting||document.hidden)return;const t=duration?clamp((now-animationStart)/duration,0,1):1;
   for(let i=0;i<phones.length;i++){
    const p=phones[i],sign=i?1:-1;let k=t;
@@ -107,10 +127,10 @@ function start(){
   if(t<1){stage.dataset.phase='animating';snapshot('animating');raf=requestAnimationFrame(render);}else{stage.dataset.phase='ready';document.getElementById('skip-stage').hidden=true;status.textContent=back?'카메라·금속 프레임·측면 버튼을 확인하세요.':'화면을 스크롤하고, 아래 버튼으로 추천 기준을 바꿔보세요.';snapshot('ready');}
  }
  function wake(){cancelAnimationFrame(raf);raf=requestAnimationFrame(render);}
- function animate(nextKind,nextBack=false,ms=1100){kind=nextKind;back=nextBack;stage.dataset.phase='animating';snapshot('animating');phones.forEach(p=>{p.fromX=p.group.position.x;p.fromY=p.group.rotation.y;});animationStart=performance.now();duration=reduced.matches?0:ms;document.getElementById('turn-phones').setAttribute('aria-pressed',String(back));document.getElementById('turn-phones').textContent=back?'화면으로 돌아오기':'기기 뒷면 보기';wake();}
- function resize(){width=stage.clientWidth;height=stage.clientHeight;mobile=innerWidth<=760;const viewHeight=mobile?7.35:Math.max(7.5,8*height/width);section.style.setProperty('--phone-label-width',`${8.88*height/viewHeight}px`);const viewWidth=viewHeight*width/height;camera.left=-viewWidth/2;camera.right=viewWidth/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();renderer.setSize(width,height);cssRenderer.setSize(width,height);wake();}
+ function animate(nextKind,nextBack=false,ms=1100){kind=nextKind;back=nextBack;stage.dataset.phase='animating';snapshot('animating');phones.forEach(p=>{p.fromX=p.group.position.x;p.fromY=p.group.rotation.y;});animationStart=performance.now();duration=reduced.matches?0:ms;document.getElementById('turn-phones').setAttribute('aria-pressed',String(back));updateTurnLabel();wake();}
+ function resize(){width=stage.clientWidth;height=stage.clientHeight;mobile=innerWidth<=760;const viewHeight=mobile?7.35:document.body.classList.contains('presentation-mode')?Math.max(6.62,8.1*height/width):Math.max(7.5,8*height/width);section.style.setProperty('--phone-label-width',`${8.88*height/viewHeight}px`);const viewWidth=viewHeight*width/height;camera.left=-viewWidth/2;camera.right=viewWidth/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();renderer.setSize(width,height);cssRenderer.setSize(width,height);wake();}
  api={front:()=>{if(back)animate('turn',false);},focus:()=>animate('focus',false,600)};
- document.getElementById('replay-stage').onclick=()=>{stage.scrollIntoView({block:'center',behavior:'instant'});back=false;kind='intro';animationStart=performance.now();duration=reduced.matches?0:4200;document.getElementById('skip-stage').hidden=reduced.matches;document.getElementById('turn-phones').setAttribute('aria-pressed','false');document.getElementById('turn-phones').textContent='기기 뒷면 보기';wake();};
+ document.getElementById('replay-stage').onclick=()=>{stage.scrollIntoView({block:'center',behavior:'instant'});back=false;kind='intro';animationStart=performance.now();duration=reduced.matches?0:4200;document.getElementById('skip-stage').hidden=reduced.matches;document.getElementById('turn-phones').setAttribute('aria-pressed','false');updateTurnLabel();wake();};
  document.getElementById('skip-stage').onclick=()=>{animationStart=performance.now()-10000;wake();};
  document.getElementById('turn-phones').onclick=()=>{stage.scrollIntoView({block:'center',behavior:'instant'});animate('turn',!back);};
  new ResizeObserver(resize).observe(stage);

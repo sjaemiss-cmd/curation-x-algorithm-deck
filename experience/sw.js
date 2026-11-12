@@ -1,6 +1,6 @@
 // A content-derived revision makes updates atomic. New workers wait until old
 // tabs close; never replace data/scripts halfway through an experiment.
-const CACHE = 'curation-presentation-7643f9e24a4dbc5c';
+const CACHE = 'curation-presentation-15ff3f52eec72017';
 const FILES = ["index.html", "single.html", "classic.html", "stage.css", "style.css", "device-ui.css", "compare.css", "compare.mjs", "app.mjs", "active-engine.mjs", "engine.mjs", "twitter-engine.mjs", "translations.mjs", "phone-stage.bundle.js", "presentation-cache.js", "data/posts.json", "data/posts.ko.json", "data/source-defaults.json", "data/twitter-2023-defaults.json", "data/provenance.json"];
 const ROOT = new URL('./', self.location.href);
 const key = url => {

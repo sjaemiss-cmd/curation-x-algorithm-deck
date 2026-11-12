@@ -2,10 +2,10 @@ from pathlib import Path
 import re,json,hashlib,html as html_lib
 root=Path(__file__).resolve().parents[1]
 read=lambda name:(root/name).read_text(encoding='utf8')
-def version_assets(document):
- return re.sub(r'((?:src|href)="[^"?#]+\.(?:css|mjs|js|html))(\?[^"#]*)?"',lambda m:m[1]+(m[2]+'&amp;' if m[2] else '?')+'v=scene1"',document)
+def version_assets(document, revision='scene1'):
+ return re.sub(r'((?:src|href)="[^"?#]+\.(?:css|mjs|js|html))(\?[^"#]*)?"',lambda m:m[1]+(m[2]+'&amp;' if m[2] else '?')+'v='+revision+'"',document)
 template=read('single-template.html')
-(root/'single.html').write_text(version_assets(template),encoding='utf8')
+(root/'single.html').write_text(version_assets(template,'legibility1'),encoding='utf8')
 data={f'data/{n}':json.loads(read('data/'+n)) for n in ['posts.json','posts.ko.json','source-defaults.json','twitter-2023-defaults.json','provenance.json']}
 exports='HEADS,NEG,CONT,DEFAULT_OPTIONS,validateWeights,rank,simulate'
 xengine=read('engine.mjs').replace('export ','')
@@ -26,7 +26,7 @@ compare=read('compare.html');(root/'classic.html').write_text(version_assets(com
 compare=compare.replace('<link rel="stylesheet" href="compare.css">','<style>'+read('compare.css')+'</style>').replace('<script src="compare.mjs" type="module"></script>','<script type="module">'+read('compare.mjs')+'</script>')
 for year,child in children.items():compare=compare.replace(f'src="single.html?year={year}"','srcdoc="'+html_lib.escape(child,quote=True)+'"')
 (root/'비교앱.html').write_text(compare,encoding='utf8')
-stage=read('stage-template.html');(root/'index.html').write_text(version_assets(stage),encoding='utf8')
+stage=read('stage-template.html');(root/'index.html').write_text(version_assets(stage,'legibility1'),encoding='utf8')
 stage=stage.replace('<link rel="stylesheet" href="stage.css">','<style>'+read('stage.css')+'</style>').replace('<script src="compare.mjs" type="module"></script>','<script type="module">'+read('compare.mjs')+'</script>').replace('<script src="phone-stage.bundle.js"></script>','<script>'+read('phone-stage.bundle.js').replace('</script','<\\/script')+'</script>')
 stage=stage.replace('<script src="presentation-cache.js"></script>','<script>'+read('presentation-cache.js')+'</script>')
 for year,child in children.items():
